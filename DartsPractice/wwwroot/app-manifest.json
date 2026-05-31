@@ -1,8 +1,0 @@
-{
-  "PluginRegistry": [
-    {
-      "AssemblyFile": "DartsPractice.Games.Standard.dll",
-      "Enabled": true
-    }
-  ]
-}
