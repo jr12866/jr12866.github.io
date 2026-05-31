@@ -1,0 +1,155 @@
+﻿@page "/play"
+@using System.Text.Json
+@using DartsPractice.Core.Models
+@using DartsPractice.Data
+@using DartsPractice.Services
+@using DartsPractice.Components
+@using IndexedDB.Blazor
+@inject GameStateContainer StateContainer
+@inject MatchManager Match
+@inject IIndexedDbFactory DbFactory
+@inject NavigationManager Nav
+
+<div class="container py-4">
+    @if (StateContainer.SelectedGame == null) { <p>No game active. <a href="">Go back home</a>.</p> }
+    else if (_isConfiguring)
+    {
+        <div class="card p-4 mx-auto" style="max-width: 500px;">
+            <h4>Setup @StateContainer.SelectedGame.Name</h4>
+            @if (StateContainer.SelectedGame.AvailablePresets?.Any() == true)
+            {
+                <select class="form-select mb-3" @bind="StateContainer.SelectedPresetId">
+                    @foreach (var p in StateContainer.SelectedGame.AvailablePresets) { <option value="@p.Id">@p.Name</option> }
+                </select>
+            }
+            <label class="fw-bold mb-2">Select Profiles:</label>
+            <div class="d-flex flex-wrap gap-2 mb-4">
+                @if (_profiles == null) { <p class="small">Loading...</p> }
+                else
+                {
+                    @foreach (var p in _profiles)
+                    {
+                        var isSel = _selectedNames.Contains(p.Name);
+                        <button class="btn @(isSel ? "btn-primary":"btn-outline-secondary")" @onclick="() => Toggle(p.Name)">@p.Name</button>
+                    }
+                }
+            </div>
+            <button class="btn btn-success btn-lg w-100" disabled="@(!_selectedNames.Any())" @onclick="Start">Launch Match</button>
+        </div>
+    }
+    else
+    {
+        <div class="row">
+            <div class="col-md-8 text-center">
+                <span class="badge bg-primary fs-5 mb-2">🎯 @Match.CurrentPlayer.Name's Turn</span>
+                <h1 class="display-3 text-danger fw-bold">@Match.CurrentPlayer.GameInstance.CurrentTarget.DisplayName</h1>
+                <h6 class="text-muted mb-4">Darts left: @Match.CurrentPlayer.GameInstance.DartsRemainingInTurn | @Match.CurrentPlayer.GameInstance.GetCurrentStatus()</h6>
+
+                @if (!Match.IsMatchOver)
+                {
+                    <Dartboard OnDartHit="Process" />
+                    <div class="d-flex gap-2 justify-content-center mt-3" style="max-width:420px; margin:auto;">
+                        <button class="btn btn-outline-danger w-25" @onclick='() => Process(new DartTarget { Value = 0 })'>Miss</button>
+                        <button class="btn btn-warning w-75" @onclick="Undo">↩️ Undo Last Dart</button>
+                    </div>
+                }
+                else
+                {
+                    <div class="alert alert-success mt-4">🎉 Match Complete! Winner: <strong>@Match.CurrentPlayer.Name</strong></div>
+                    <button id="save-btn" class="btn btn-primary" @onclick="DoSave">💾 Save & Exit</button>
+                }
+            </div>
+            <div class="col-md-4">
+                <div class="card p-3">
+                    <h6>Standings</h6>
+                    <div class="list-group">
+                        @foreach (var p in Match.Players)
+                        {
+                            <div class="list-group-item @(p == Match.CurrentPlayer ? "list-group-item-primary fw-bold":"")">@p.Name <span class="float-end small text-muted">@p.GameInstance.GetCurrentStatus()</span></div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private bool _isConfiguring = true; 
+    private List<PlayerProfile>? _profiles; 
+    private List<string> _selectedNames = new();
+    private string? _sessionId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var db = await DbFactory.Create<DartsDb>();
+        var records = db.PlayerProfiles;
+        _profiles = records?.ToList();
+        if (StateContainer.SelectedGame?.AvailablePresets?.Any() == true) StateContainer.SelectedPresetId = StateContainer.SelectedGame.AvailablePresets.First().Id;
+    }
+
+    private void Toggle(string name) { if (_selectedNames.Contains(name)) _selectedNames.Remove(name); else _selectedNames.Add(name); }
+    private void Start() 
+    { 
+        Match.InitializeMatch(_selectedNames, StateContainer.SelectedGame!, StateContainer.SelectedPresetId); 
+        _sessionId = Guid.NewGuid().ToString();
+        _isConfiguring = false; 
+    }
+
+    private void Process(DartTarget target)
+    {
+        bool endTurn = Match.CurrentPlayer.GameInstance.RecordDart(target);
+        if (endTurn)
+        {
+            Match.CurrentPlayer.GameInstance.EndTurn();
+            if (!Match.IsMatchOver) Match.AdvanceTurn();
+        }
+    }
+
+    private void Undo()
+    {
+        if (Match.CurrentPlayer.GameInstance.DartsRemainingInTurn == 3) Match.RegressTurn();
+        Match.CurrentPlayer.GameInstance.UndoLastDart();
+    }
+
+    private async Task DoSave()
+    {
+        string saveId = _sessionId ?? Guid.NewGuid().ToString();
+        
+        // Save match record
+        using (var db1 = await DbFactory.Create<DartsDb>())
+        {
+            var summaries = Match.Players.Select(p => new PlayerSessionSummary { PlayerName = p.Name, FinalStatus = p.GameInstance.GetCurrentStatus(), TotalTurnsPlayed = p.GameInstance.TurnHistory.Count }).ToList();
+            var detailedTurns = Match.Players.SelectMany(p => p.GameInstance.TurnHistory).ToList();
+            db1.MatchRecords.Add(new MatchRecord
+            {
+                GameName = StateContainer.SelectedGame!.Name,
+                PresetName = "Default",
+                DatePlayed = DateTime.Now,
+                WinnerName = Match.CurrentPlayer.Name,
+                PlayerStatsJson = JsonSerializer.Serialize(summaries),
+                SessionId = saveId,
+                DetailedTurnsJson = JsonSerializer.Serialize(detailedTurns)
+            });
+            await db1.SaveChanges();
+        }
+        
+        // Update profiles in a separate operation
+        using (var db2 = await DbFactory.Create<DartsDb>())
+        {
+            var allProfiles = db2.PlayerProfiles;
+            foreach (var p in Match.Players)
+            {
+                var prof = allProfiles.FirstOrDefault(x => x.Name == p.Name);
+                if (prof != null) { prof.LifetimeMatchesPlayed++; prof.LifetimeTurnsThrown += p.GameInstance.TurnHistory.Count; if (p.Name == Match.CurrentPlayer.Name) prof.LifetimeMatchesWon++; }
+            }
+            await db2.SaveChanges();
+        }
+        
+        // Wait for all transactions to complete
+        await Task.Delay(500);
+        
+        StateContainer.ClearGame(); 
+        Nav.NavigateTo("");
+    }
+}

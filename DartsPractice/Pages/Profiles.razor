@@ -1,0 +1,51 @@
+﻿@page "/profiles"
+@using DartsPractice.Core.Models
+@using DartsPractice.Data
+@using IndexedDB.Blazor
+@inject IIndexedDbFactory DbFactory
+@inject NavigationManager Nav
+
+<div class="container py-4" style="max-width: 600px;">
+    <div class="d-flex justify-content-between align-items-center mb-4"><h4>👥 Player Profiles</h4><button class="btn btn-sm btn-outline-secondary" @onclick='() => Nav.NavigateTo("")'>Home</button></div>
+    <div class="input-group mb-4">
+        <input type="text" class="form-control" @bind="_name" @bind:event="oninput" placeholder="New player name" />
+        <button class="btn btn-primary" @onclick="Add" disabled="@string.IsNullOrWhiteSpace(_name)">Add</button>
+    </div>
+    @if (_items == null) { <p>Loading...</p> }
+    else
+    {
+        <ul class="list-group">
+            @foreach (var item in _items)
+            {
+                <li class="list-group-item d-flex justify-content-between align-items-center">@item.Name (Win: @item.LifetimeMatchesWon / @item.LifetimeMatchesPlayed) <button class="btn btn-sm btn-danger" @onclick="() => Delete(item.Id)">Delete</button></li>
+            }
+        </ul>
+    }
+</div>
+
+@code {
+    private string _name = string.Empty; private List<PlayerProfile>? _items;
+    protected override async Task OnInitializedAsync() => await Load();
+    private async Task Load()
+    {
+        using var db = await this.DbFactory.Create<DartsDb>();
+        _items = db.PlayerProfiles.ToList();
+    }
+    private async Task Add()
+    {
+        using var db = await this.DbFactory.Create<DartsDb>();
+        db.PlayerProfiles.Add(new PlayerProfile { Name = _name.Trim() });
+        await db.SaveChanges();
+        _name = string.Empty;
+        await Load();
+    }
+    private async Task Delete(int id) { 
+        using var db = await this.DbFactory.Create<DartsDb>();
+        var player = db.PlayerProfiles.SingleOrDefault(o => o.Id == id);
+        if (player is not null){
+            db.PlayerProfiles.Remove(player);
+            await db.SaveChanges();
+            await Load();
+        }
+    }
+}

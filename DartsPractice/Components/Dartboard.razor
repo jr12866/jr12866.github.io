@@ -1,0 +1,93 @@
+﻿@using DartsPractice.Core.Models
+@implements IDisposable
+@inject IJSRuntime JSRuntime
+
+<div class="dartboard-container text-center">
+    @((MarkupString)_svgContent)
+</div>
+
+@code {
+    [Parameter] public EventCallback<DartTarget> OnDartHit { get; set; }
+    private readonly int[] _boardNumbers = { 20, 1, 18, 4, 13, 6, 10, 15, 2, 17, 3, 19, 7, 16, 8, 11, 14, 9, 12, 5 };
+    private string _svgContent = "";
+    private DotNetObjectReference<Dartboard>? _dotNetHelper;
+
+    protected override void OnInitialized()
+    {
+        BuildSvg();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _dotNetHelper = DotNetObjectReference.Create(this);
+            await JSRuntime.InvokeVoidAsync("setDartboardReference", _dotNetHelper);
+        }
+    }
+
+    private void BuildSvg()
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.Append("<svg viewBox=\"-250 -250 500 500\" width=\"100%\" style=\"max-width: 420px;\" class=\"shadow-lg rounded-circle p-2\">");
+        
+        for (int i = 0; i < _boardNumbers.Length; i++)
+        {
+            double angle = (i * 18) - 90;
+            double rad = angle * Math.PI / 180;
+            double x = 215 * Math.Cos(rad);
+            double y = 215 * Math.Sin(rad);
+            
+            sb.Append($"<text x=\"{x:F1}\" y=\"{y:F1}\" fill=\"#FFFFFF\" font-weight=\"bold\" font-size=\"24\" font-family=\"Segoe UI, sans-serif\" text-anchor=\"middle\" dominant-baseline=\"middle\" style=\"cursor: default; user-select: none; text-shadow: 0 1px 3px rgba(0,0,0,0.8);\">{_boardNumbers[i]}</text>");
+        }
+        
+        for (int i = 0; i < _boardNumbers.Length; i++)
+        {
+            int num = _boardNumbers[i];
+            double startAngle = (i * 18) - 9;
+            double endAngle = (i * 18) + 9;
+            bool isEven = i % 2 == 0;
+            string mainColor = isEven ? "#111111" : "#f8f9fa";
+            string ringColor = isEven ? "#dc3545" : "#198754";
+            string d = Wedge(startAngle, endAngle, 160, 172);
+            
+            sb.Append($"<path d=\"{d}\" fill=\"{ringColor}\" stroke=\"rgba(133,129,158,0.3)\" stroke-width=\"1\" style=\"cursor: pointer;\" onclick=\"dartboardClick({num}, 'Double')\" />");
+            d = Wedge(startAngle, endAngle, 98, 160);
+            sb.Append($"<path d=\"{d}\" fill=\"{mainColor}\" stroke=\"rgba(133,129,158,0.3)\" stroke-width=\"1\" style=\"cursor: pointer;\" onclick=\"dartboardClick({num}, 'Single')\" />");
+            d = Wedge(startAngle, endAngle, 86, 98);
+            sb.Append($"<path d=\"{d}\" fill=\"{ringColor}\" stroke=\"rgba(133,129,158,0.3)\" stroke-width=\"1\" style=\"cursor: pointer;\" onclick=\"dartboardClick({num}, 'Triple')\" />");
+            d = Wedge(startAngle, endAngle, 16, 86);
+            sb.Append($"<path d=\"{d}\" fill=\"{mainColor}\" stroke=\"rgba(133,129,158,0.3)\" stroke-width=\"1\" style=\"cursor: pointer;\" onclick=\"dartboardClick({num}, 'Single')\" />");
+        }
+        
+        sb.Append("<circle cx=\"0\" cy=\"0\" r=\"16\" fill=\"#198754\" stroke=\"rgba(133,129,158,0.3)\" stroke-width=\"1\" style=\"cursor: pointer;\" onclick=\"dartboardClick(25, 'Single')\" />");
+        sb.Append("<circle cx=\"0\" cy=\"0\" r=\"6.5\" fill=\"#dc3545\" stroke=\"rgba(133,129,158,0.3)\" stroke-width=\"1\" style=\"cursor: pointer;\" onclick=\"dartboardClick(25, 'Double')\" />");
+        
+        sb.Append("</svg>");
+        _svgContent = sb.ToString();
+    }
+
+    [JSInvokable]
+    public async Task HandleSegmentClick(int value, string segmentType)
+    {
+        var seg = segmentType switch
+        {
+            "Double" => SegmentType.Double,
+            "Triple" => SegmentType.Triple,
+            _ => SegmentType.Single
+        };
+        await OnDartHit.InvokeAsync(new DartTarget { Value = value, Segment = seg });
+    }
+
+    private string Wedge(double start, double end, double inner, double outer)
+    {
+        var sRad = (start - 90) * Math.PI / 180;
+        var eRad = (end - 90) * Math.PI / 180;
+        return $"M {outer * Math.Cos(sRad)} {outer * Math.Sin(sRad)} A {outer} {outer} 0 0 1 {outer * Math.Cos(eRad)} {outer * Math.Sin(eRad)} L {inner * Math.Cos(eRad)} {inner * Math.Sin(eRad)} A {inner} {inner} 0 0 0 {inner * Math.Cos(sRad)} {inner * Math.Sin(sRad)} Z";
+    }
+
+    public void Dispose()
+    {
+        _dotNetHelper?.Dispose();
+    }
+}

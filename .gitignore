@@ -1,0 +1,21 @@
+﻿# .gitignore documentation: https://git-scm.com/docs/gitignore
+
+# you can ignore files
+.DS_Store
+*.log
+*.tmp
+*.user
+*.suo
+appsettings.Development.json
+secrets.json
+
+# or folders
+dist/
+build/
+out/
+bin/
+obj/
+.vs/
+.idea/
+packages/
+
