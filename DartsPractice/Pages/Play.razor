@@ -43,20 +43,29 @@
             <div class="col-md-8 text-center">
                 <span class="badge bg-primary fs-5 mb-2">🎯 @Match.CurrentPlayer.Name's Turn</span>
                 <h1 class="display-3 text-danger fw-bold">@Match.CurrentPlayer.GameInstance.CurrentTarget.DisplayName</h1>
-                <h6 class="text-muted mb-4">Darts left: @Match.CurrentPlayer.GameInstance.DartsRemainingInTurn | @Match.CurrentPlayer.GameInstance.GetCurrentStatus()</h6>
+                <DartsRemainingIndicator DartsRemaining="Match.CurrentPlayer?.GameInstance?.DartsRemainingInTurn ?? 3" />
 
                 @if (!Match.IsMatchOver)
                 {
                     <Dartboard OnDartHit="Process" />
                     <div class="d-flex gap-2 justify-content-center mt-3" style="max-width:420px; margin:auto;">
                         <button class="btn btn-outline-danger w-25" @onclick='() => Process(new DartTarget { Value = 0 })'>Miss</button>
-                        <button class="btn btn-warning w-75" @onclick="Undo">↩️ Undo Last Dart</button>
+                        <button class="btn btn-warning w-50" @onclick="Undo">↩️ Undo Last Dart</button>
+                        <button class="btn btn-outline-secondary w-25" @onclick="ConfirmQuit">✕ Quit</button>
                     </div>
+                    @if (_showQuitConfirm)
+                    {
+                        <div class="alert alert-warning mt-3">
+                            <p class="mb-2">Quit and save current progress?</p>
+                            <button class="btn btn-danger btn-sm me-2" @onclick="Quit">Yes, Quit</button>
+                            <button class="btn btn-secondary btn-sm" @onclick="() => _showQuitConfirm = false">Cancel</button>
+                        </div>
+                    }
                 }
                 else
                 {
                     <div class="alert alert-success mt-4">🎉 Match Complete! Winner: <strong>@Match.CurrentPlayer.Name</strong></div>
-                    <button id="save-btn" class="btn btn-primary" @onclick="DoSave">💾 Save & Exit</button>
+                    <button id="save-btn" class="btn btn-primary" @onclick="() => DoSave()">💾 Save & Exit</button>
                 }
             </div>
             <div class="col-md-4">
@@ -112,10 +121,17 @@
         Match.CurrentPlayer.GameInstance.UndoLastDart();
     }
 
-    private async Task DoSave()
+    private bool _showQuitConfirm = false;
+    private void ConfirmQuit() => _showQuitConfirm = true;
+    private async Task Quit()
+    {
+        await DoSave(isQuitEarly: true);
+    }
+
+    private async Task DoSave(bool isQuitEarly = false)
     {
         string saveId = _sessionId ?? Guid.NewGuid().ToString();
-        
+
         // Save match record
         using (var db1 = await DbFactory.Create<DartsDb>())
         {
@@ -126,14 +142,15 @@
                 GameName = StateContainer.SelectedGame!.Name,
                 PresetName = "Default",
                 DatePlayed = DateTime.Now,
-                WinnerName = Match.CurrentPlayer.Name,
+                WinnerName = isQuitEarly ? "" : Match.CurrentPlayer.Name,
                 PlayerStatsJson = JsonSerializer.Serialize(summaries),
                 SessionId = saveId,
-                DetailedTurnsJson = JsonSerializer.Serialize(detailedTurns)
+                DetailedTurnsJson = JsonSerializer.Serialize(detailedTurns),
+                QuitEarly = isQuitEarly
             });
             await db1.SaveChanges();
         }
-        
+
         // Update profiles in a separate operation
         using (var db2 = await DbFactory.Create<DartsDb>())
         {
@@ -141,15 +158,15 @@
             foreach (var p in Match.Players)
             {
                 var prof = allProfiles.FirstOrDefault(x => x.Name == p.Name);
-                if (prof != null) { prof.LifetimeMatchesPlayed++; prof.LifetimeTurnsThrown += p.GameInstance.TurnHistory.Count; if (p.Name == Match.CurrentPlayer.Name) prof.LifetimeMatchesWon++; }
+                if (prof != null) { prof.LifetimeMatchesPlayed++; prof.LifetimeTurnsThrown += p.GameInstance.TurnHistory.Count; if (!isQuitEarly && p.Name == Match.CurrentPlayer.Name) prof.LifetimeMatchesWon++; }
             }
             await db2.SaveChanges();
         }
-        
+
         // Wait for all transactions to complete
         await Task.Delay(500);
-        
-        StateContainer.ClearGame(); 
+
+        StateContainer.ClearGame();
         Nav.NavigateTo("");
     }
 }

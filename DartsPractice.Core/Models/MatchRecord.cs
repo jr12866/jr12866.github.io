@@ -13,4 +13,5 @@ public class MatchRecord
     public string PlayerStatsJson { get; set; } = string.Empty;
     public string? SessionId { get; set; }
     public string DetailedTurnsJson { get; set; } = string.Empty;
+    public bool QuitEarly { get; set; } = false;
 }

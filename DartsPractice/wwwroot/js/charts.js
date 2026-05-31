@@ -15,6 +15,7 @@ window.renderDartsDashboardCharts = function (gameLabels, gameCounts, timelineLa
     if (existingChart1) existingChart1.destroy();
     if (existingChart2) existingChart2.destroy();
 
+
     // 3. Render Game Distribution Chart
     new Chart(canvas1, {
         type: 'bar',

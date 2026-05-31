@@ -2,6 +2,24 @@ self.importScripts('./service-worker-assets.js');
 self.addEventListener('install', event => event.waitUntil(onInstall(event)));
 self.addEventListener('activate', event => event.waitUntil(onActivate(event)));
 self.addEventListener('fetch', event => event.respondWith(onFetch(event)));
+self.addEventListener('message', event => {
+    if (event.data && event.data.type === 'SKIP_WAITING') {
+        console.info('SW: Received SKIP_WAITING');
+        self.skipWaiting().then(() => {
+            console.info('SW: skipWaiting complete, claiming clients');
+            return self.clients.claim();
+        }).then(() => {
+            console.info('SW: clients claimed, notifying all clients to reload');
+            return self.clients.matchAll();
+        }).then(clients => {
+            clients.forEach(client => {
+                client.postMessage({ type: 'SW_ACTIVATED' });
+            });
+        }).catch(err => {
+            console.error('SW: Error in skipWaiting chain:', err);
+        });
+    }
+});
 
 const cacheNamePrefix = 'offline-cache-';
 const cacheName = `${cacheNamePrefix}${self.assetsManifest.version}`;
