@@ -1,0 +1,21 @@
+{
+  "name": "HuntR - Hunting Party Tracker",
+  "short_name": "HuntR",
+  "description": "Track your hunting party in real-time with live maps, chat, and pins",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#1a1a1a",
+  "theme_color": "#2D5016",
+  "orientation": "portrait-primary",
+  "categories": ["navigation", "utilities"],
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [],
+  "prefer_related_applications": false
+}
