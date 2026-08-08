@@ -8,678 +8,139 @@
   <meta name="theme-color" content="#1a1a1a">
   <title>HuntR</title>
   <link rel="manifest" href="manifest.json">
-  <link rel="apple-touch-icon" href="icon.png">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-      -webkit-tap-highlight-color: transparent;
-    }
-
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     :root {
-      --primary: #2D5016;
-      --primary-light: #4A7C23;
-      --secondary: #8B4513;
-      --background: #1a1a1a;
-      --surface: #2d2d2d;
-      --surface-light: #3d3d3d;
-      --text: #ffffff;
-      --text-secondary: #b0b0b0;
-      --danger: #dc3545;
-      --success: #28a745;
-    }
-
-    html, body {
-      height: 100%;
-      overflow: hidden;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: var(--background);
-      color: var(--text);
-    }
-
-    #app {
-      display: flex;
-      flex-direction: column;
-      height: 100%;
-      height: 100vh;
-      height: 100dvh;
-    }
-
-    /* Header */
-    .header {
-      background: var(--surface);
-      padding: 12px 16px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      border-bottom: 1px solid var(--surface-light);
-      flex-shrink: 0;
-    }
-
-    .header h1 {
-      color: var(--primary-light);
-      font-size: 20px;
-    }
-
-    .header-btn {
-      padding: 8px 12px;
-      background: var(--surface-light);
-      border: none;
-      border-radius: 6px;
-      color: var(--text);
-      font-size: 12px;
-      cursor: pointer;
-    }
-
-    .header-btn.danger {
-      background: var(--danger);
-    }
-
-    /* Tab Bar */
-    .tab-bar {
-      display: flex;
-      background: var(--surface);
-      border-bottom: 1px solid var(--surface-light);
-      flex-shrink: 0;
-    }
-
-    .tab {
-      flex: 1;
-      padding: 12px;
-      background: none;
-      border: none;
-      color: var(--text-secondary);
-      font-size: 14px;
-      cursor: pointer;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 4px;
-      border-bottom: 3px solid transparent;
-    }
-
-    .tab.active {
-      color: var(--primary-light);
-      border-bottom-color: var(--primary-light);
-    }
-
-    .tab-icon {
-      font-size: 24px;
-    }
-
-    /* Content */
-    .content {
-      flex: 1;
-      overflow: hidden;
-      position: relative;
-    }
-
-    /* Map */
-    #map {
-      width: 100%;
-      height: 100%;
-    }
-
-    /* Screens */
-    .screen {
-      display: none;
-      height: 100%;
-      flex-direction: column;
-    }
-
-    .screen.active {
-      display: flex;
-    }
-
-    /* Welcome Screen */
-    .welcome-screen {
-      justify-content: center;
-      align-items: center;
-      padding: 32px;
-      gap: 24px;
-    }
-
-    .welcome-title {
-      font-size: 48px;
-      color: var(--primary-light);
-    }
-
-    .welcome-subtitle {
-      color: var(--text-secondary);
-      text-align: center;
-      font-size: 16px;
-    }
-
-    .welcome-btn {
-      width: 100%;
-      max-width: 300px;
-      padding: 16px;
-      border: none;
-      border-radius: 12px;
-      font-size: 18px;
-      font-weight: 600;
-      cursor: pointer;
-    }
-
-    .welcome-btn.primary {
-      background: var(--primary);
-      color: var(--text);
-    }
-
-    .welcome-btn.secondary {
-      background: var(--surface-light);
-      color: var(--text);
-    }
-
-    /* Form Screen */
-    .form-screen {
-      padding: 24px;
-      gap: 20px;
-    }
-
-    .form-title {
-      font-size: 24px;
-      text-align: center;
-    }
-
-    .form-group {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    .form-group label {
-      font-size: 14px;
-      color: var(--text-secondary);
-    }
-
-    .form-input {
-      padding: 14px 16px;
-      border: 2px solid var(--surface-light);
-      border-radius: 10px;
-      background: var(--surface);
-      color: var(--text);
-      font-size: 16px;
-    }
-
-    .form-input:focus {
-      outline: none;
-      border-color: var(--primary-light);
-    }
-
-    /* Color Picker */
-    .color-picker {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
-      justify-content: center;
-    }
-
-    .color-option {
-      width: 44px;
-      height: 44px;
-      border-radius: 50%;
-      border: 3px solid transparent;
-      cursor: pointer;
-    }
-
-    .color-option.selected {
-      border-color: white;
-      transform: scale(1.1);
-    }
-
-    /* Party Info */
-    .party-info {
-      padding: 16px;
-      background: var(--surface);
-      border-bottom: 1px solid var(--surface-light);
-    }
-
-    .invite-code {
-      font-size: 18px;
-      color: var(--primary-light);
-      font-family: monospace;
-      text-align: center;
-      padding: 12px;
-      background: var(--background);
-      border-radius: 8px;
-      margin-bottom: 12px;
-    }
-
-    .member-count {
-      text-align: center;
-      color: var(--text-secondary);
-      font-size: 14px;
-    }
-
-    /* Chat */
-    .chat-messages {
-      flex: 1;
-      overflow-y: auto;
-      padding: 12px;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    .chat-message {
-      max-width: 80%;
-      padding: 10px 14px;
-      border-radius: 16px;
-      background: var(--surface);
-    }
-
-    .chat-message.own {
-      background: var(--primary);
-      align-self: flex-end;
-    }
-
-    .chat-sender {
-      font-size: 11px;
-      color: var(--primary-light);
-      margin-bottom: 4px;
-    }
-
-    .chat-message.own .chat-sender {
-      color: rgba(255,255,255,0.7);
-    }
-
-    .chat-content {
-      font-size: 15px;
-      line-height: 1.4;
-    }
-
-    .chat-time {
-      font-size: 10px;
-      color: var(--text-secondary);
-      margin-top: 4px;
-      text-align: right;
-    }
-
-    .chat-input-area {
-      display: flex;
-      gap: 8px;
-      padding: 12px;
-      background: var(--surface);
-      border-top: 1px solid var(--surface-light);
-    }
-
-    .chat-input {
-      flex: 1;
-      padding: 12px 16px;
-      border: none;
-      border-radius: 20px;
-      background: var(--background);
-      color: var(--text);
-      font-size: 16px;
-    }
-
-    .chat-btn {
-      width: 48px;
-      height: 48px;
-      border: none;
-      border-radius: 50%;
-      background: var(--primary);
-      color: white;
-      font-size: 20px;
-      cursor: pointer;
-    }
-
-    /* Map Controls */
-    .map-controls {
-      position: absolute;
-      bottom: 20px;
-      right: 16px;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      z-index: 1000;
-    }
-
-    .map-btn {
-      width: 52px;
-      height: 52px;
-      border-radius: 50%;
-      background: var(--surface);
-      border: none;
-      color: var(--text);
-      font-size: 24px;
-      cursor: pointer;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-    }
-
-    /* Pin Modal */
-    .modal {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(0,0,0,0.8);
-      display: none;
-      justify-content: flex-end;
-      z-index: 2000;
-    }
-
-    .modal.active {
-      display: flex;
-    }
-
-    .modal-content {
-      background: var(--surface);
-      border-radius: 20px 20px 0 0;
-      padding: 20px;
-      max-height: 80%;
-      width: 100%;
-      overflow-y: auto;
-    }
-
-    .modal-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 20px;
-    }
-
-    .modal-title {
-      font-size: 20px;
-    }
-
-    .modal-close {
-      width: 36px;
-      height: 36px;
-      border-radius: 50%;
-      background: var(--surface-light);
-      border: none;
-      color: var(--text);
-      font-size: 20px;
-      cursor: pointer;
-    }
-
-    .pin-types {
-      display: flex;
-      gap: 8px;
-      margin-bottom: 16px;
-    }
-
-    .pin-type {
-      flex: 1;
-      padding: 12px 8px;
-      background: var(--surface-light);
-      border: 2px solid transparent;
-      border-radius: 10px;
-      text-align: center;
-      cursor: pointer;
-      color: var(--text);
-    }
-
-    .pin-type.selected {
-      border-color: var(--primary-light);
-      background: var(--background);
-    }
-
-    .pin-type-icon {
-      font-size: 28px;
-      display: block;
-      margin-bottom: 4px;
-    }
-
-    .pin-type-label {
-      font-size: 11px;
-    }
-
-    .modal-textarea {
-      width: 100%;
-      min-height: 100px;
-      padding: 12px;
-      border: none;
-      border-radius: 10px;
-      background: var(--background);
-      color: var(--text);
-      font-size: 16px;
-      resize: none;
-      margin-bottom: 16px;
-    }
-
-    .modal-btn {
-      width: 100%;
-      padding: 16px;
-      background: var(--primary);
-      border: none;
-      border-radius: 10px;
-      color: var(--text);
-      font-size: 16px;
-      font-weight: 600;
-      cursor: pointer;
-    }
-
-    /* Member Marker */
-    .member-marker {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
-
-    .member-avatar {
-      width: 36px;
-      height: 36px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: bold;
-      font-size: 14px;
-      color: white;
-      border: 3px solid white;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-    }
-
-    .member-label {
-      background: white;
-      padding: 2px 8px;
-      border-radius: 10px;
-      font-size: 11px;
-      font-weight: 600;
-      color: #333;
-      margin-top: 4px;
-      white-space: nowrap;
-    }
-
-    .pin-marker {
-      font-size: 32px;
-    }
-
-    /* Loading */
-    .loading-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(0,0,0,0.9);
-      display: none;
-      justify-content: center;
-      align-items: center;
-      flex-direction: column;
-      gap: 16px;
-      z-index: 3000;
-    }
-
-    .loading-overlay.active {
-      display: flex;
-    }
-
-    .spinner {
-      width: 48px;
-      height: 48px;
-      border: 4px solid var(--surface-light);
-      border-top-color: var(--primary-light);
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-    }
-
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-
-    /* Archives List */
-    .archives-list {
-      flex: 1;
-      overflow-y: auto;
-      padding: 12px;
-    }
-
-    .archive-card {
-      background: var(--surface);
-      border-radius: 12px;
-      padding: 16px;
-      margin-bottom: 12px;
-    }
-
-    .archive-name {
-      font-size: 16px;
-      font-weight: 600;
-      margin-bottom: 8px;
-    }
-
-    .archive-meta {
-      font-size: 12px;
-      color: var(--text-secondary);
-      margin-bottom: 12px;
-    }
-
-    .archive-stats {
-      display: flex;
-      justify-content: space-around;
-      padding: 12px 0;
-      border-top: 1px solid var(--surface-light);
-      border-bottom: 1px solid var(--surface-light);
-      margin-bottom: 12px;
-    }
-
-    .archive-stat {
-      text-align: center;
-    }
-
-    .archive-stat-value {
-      font-size: 20px;
-      font-weight: 600;
-    }
-
-    .archive-stat-label {
-      font-size: 11px;
-      color: var(--text-secondary);
-    }
-
-    .archive-share-btn {
-      width: 100%;
-      padding: 12px;
-      background: var(--surface-light);
-      border: none;
-      border-radius: 8px;
-      color: var(--primary-light);
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-    }
-
-    .empty-state {
-      text-align: center;
-      padding: 48px 24px;
-      color: var(--text-secondary);
-    }
-
-    .empty-icon {
-      font-size: 64px;
-      margin-bottom: 16px;
-    }
-
-    .hidden {
-      display: none !important;
-    }
+      --primary: #2D5016; --primary-light: #4A7C23; --secondary: #8B4513;
+      --background: #1a1a1a; --surface: #2d2d2d; --surface-light: #3d3d3d;
+      --text: #ffffff; --text-secondary: #b0b0b0; --danger: #dc3545; --success: #28a745;
+    }
+    html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--background); color: var(--text); }
+    #app { display: flex; flex-direction: column; height: 100%; }
+    .header { background: var(--surface); padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--surface-light); flex-shrink: 0; }
+    .header h1 { color: var(--primary-light); font-size: 20px; }
+    .header-btn { padding: 8px 12px; background: var(--surface-light); border: none; border-radius: 6px; color: var(--text); font-size: 12px; cursor: pointer; }
+    .header-btn.danger { background: var(--danger); }
+    .connection-status { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-secondary); }
+    .status-dot.connected { background: var(--success); }
+    .status-dot.connecting { background: #ffc107; animation: pulse 1s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    .tab-bar { display: flex; background: var(--surface); border-bottom: 1px solid var(--surface-light); flex-shrink: 0; }
+    .tab { flex: 1; padding: 12px; background: none; border: none; color: var(--text-secondary); font-size: 14px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px; border-bottom: 3px solid transparent; }
+    .tab.active { color: var(--primary-light); border-bottom-color: var(--primary-light); }
+    .tab-icon { font-size: 24px; }
+    .content { flex: 1; overflow: hidden; position: relative; }
+    #map { width: 100%; height: 100%; }
+    .screen { display: none; height: 100%; flex-direction: column; }
+    .screen.active { display: flex; }
+    .welcome-screen { justify-content: center; align-items: center; padding: 32px; gap: 24px; }
+    .welcome-title { font-size: 48px; color: var(--primary-light); }
+    .welcome-subtitle { color: var(--text-secondary); text-align: center; font-size: 16px; }
+    .welcome-btn { width: 100%; max-width: 300px; padding: 16px; border: none; border-radius: 12px; font-size: 18px; font-weight: 600; cursor: pointer; }
+    .welcome-btn.primary { background: var(--primary); color: var(--text); }
+    .welcome-btn.secondary { background: var(--surface-light); color: var(--text); }
+    .form-screen { padding: 24px; gap: 20px; overflow-y: auto; }
+    .form-title { font-size: 24px; text-align: center; }
+    .form-group { display: flex; flex-direction: column; gap: 8px; }
+    .form-group label { font-size: 14px; color: var(--text-secondary); }
+    .form-input { padding: 14px 16px; border: 2px solid var(--surface-light); border-radius: 10px; background: var(--surface); color: var(--text); font-size: 16px; }
+    .form-input:focus { outline: none; border-color: var(--primary-light); }
+    .color-picker { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; }
+    .color-option { width: 44px; height: 44px; border-radius: 50%; border: 3px solid transparent; cursor: pointer; }
+    .color-option.selected { border-color: white; transform: scale(1.1); }
+    .party-info { padding: 16px; background: var(--surface); border-bottom: 1px solid var(--surface-light); }
+    .invite-code { font-size: 18px; color: var(--primary-light); font-family: monospace; text-align: center; padding: 12px; background: var(--background); border-radius: 8px; margin-bottom: 12px; }
+    .member-count { text-align: center; color: var(--text-secondary); font-size: 14px; }
+    .chat-messages { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+    .chat-message { max-width: 80%; padding: 10px 14px; border-radius: 16px; background: var(--surface); }
+    .chat-message.own { background: var(--primary); align-self: flex-end; }
+    .chat-sender { font-size: 11px; color: var(--primary-light); margin-bottom: 4px; }
+    .chat-message.own .chat-sender { color: rgba(255,255,255,0.7); }
+    .chat-content { font-size: 15px; line-height: 1.4; }
+    .chat-time { font-size: 10px; color: var(--text-secondary); margin-top: 4px; text-align: right; }
+    .chat-input-area { display: flex; gap: 8px; padding: 12px; background: var(--surface); border-top: 1px solid var(--surface-light); }
+    .chat-input { flex: 1; padding: 12px 16px; border: none; border-radius: 20px; background: var(--background); color: var(--text); font-size: 16px; }
+    .chat-btn { width: 48px; height: 48px; border: none; border-radius: 50%; background: var(--primary); color: white; font-size: 20px; cursor: pointer; }
+    .map-controls { position: absolute; bottom: 20px; right: 16px; display: flex; flex-direction: column; gap: 8px; z-index: 1000; }
+    .map-btn { width: 52px; height: 52px; border-radius: 50%; background: var(--surface); border: none; color: var(--text); font-size: 24px; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+    .modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); display: none; justify-content: flex-end; z-index: 2000; }
+    .modal.active { display: flex; }
+    .modal-content { background: var(--surface); border-radius: 20px 20px 0 0; padding: 20px; max-height: 80%; width: 100%; overflow-y: auto; }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .modal-title { font-size: 20px; }
+    .modal-close { width: 36px; height: 36px; border-radius: 50%; background: var(--surface-light); border: none; color: var(--text); font-size: 20px; cursor: pointer; }
+    .pin-types { display: flex; gap: 8px; margin-bottom: 16px; }
+    .pin-type { flex: 1; padding: 12px 8px; background: var(--surface-light); border: 2px solid transparent; border-radius: 10px; text-align: center; cursor: pointer; color: var(--text); }
+    .pin-type.selected { border-color: var(--primary-light); background: var(--background); }
+    .pin-type-icon { font-size: 28px; display: block; margin-bottom: 4px; }
+    .pin-type-label { font-size: 11px; }
+    .modal-textarea { width: 100%; min-height: 100px; padding: 12px; border: none; border-radius: 10px; background: var(--background); color: var(--text); font-size: 16px; resize: none; margin-bottom: 16px; }
+    .modal-btn { width: 100%; padding: 16px; background: var(--primary); border: none; border-radius: 10px; color: var(--text); font-size: 16px; font-weight: 600; cursor: pointer; }
+    .loading-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.9); display: none; justify-content: center; align-items: center; flex-direction: column; gap: 16px; z-index: 3000; }
+    .loading-overlay.active { display: flex; }
+    .spinner { width: 48px; height: 48px; border: 4px solid var(--surface-light); border-top-color: var(--primary-light); border-radius: 50%; animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .archives-list { flex: 1; overflow-y: auto; padding: 12px; }
+    .archive-card { background: var(--surface); border-radius: 12px; padding: 16px; margin-bottom: 12px; }
+    .archive-name { font-size: 16px; font-weight: 600; margin-bottom: 8px; }
+    .archive-meta { font-size: 12px; color: var(--text-secondary); margin-bottom: 12px; }
+    .archive-stats { display: flex; justify-content: space-around; padding: 12px 0; border-top: 1px solid var(--surface-light); border-bottom: 1px solid var(--surface-light); margin-bottom: 12px; }
+    .archive-stat { text-align: center; }
+    .archive-stat-value { font-size: 20px; font-weight: 600; }
+    .archive-stat-label { font-size: 11px; color: var(--text-secondary); }
+    .archive-share-btn { width: 100%; padding: 12px; background: var(--surface-light); border: none; border-radius: 8px; color: var(--primary-light); font-size: 14px; font-weight: 600; cursor: pointer; }
+    .empty-state { text-align: center; padding: 48px 24px; color: var(--text-secondary); }
+    .empty-icon { font-size: 64px; margin-bottom: 16px; }
+    .hidden { display: none !important; }
   </style>
 </head>
 <body>
   <div id="app">
-    <div class="header" id="app-header" class="hidden">
+    <div class="header hidden" id="app-header">
       <h1>HuntR</h1>
+      <div class="connection-status">
+        <span class="status-dot" id="status-dot"></span>
+        <span id="status-text">Offline</span>
+      </div>
       <button class="header-btn danger" id="btn-end-hunt">End Hunt</button>
     </div>
-
     <div class="tab-bar hidden" id="tab-bar">
-      <button class="tab active" data-tab="map">
-        <span class="tab-icon">🗺️</span>
-        Map
-      </button>
-      <button class="tab" data-tab="chat">
-        <span class="tab-icon">💬</span>
-        Chat
-      </button>
-      <button class="tab" data-tab="archives">
-        <span class="tab-icon">📁</span>
-        Archives
-      </button>
+      <button class="tab active" data-tab="map"><span class="tab-icon">🗺️</span>Map</button>
+      <button class="tab" data-tab="chat"><span class="tab-icon">💬</span>Chat</button>
+      <button class="tab" data-tab="archives"><span class="tab-icon">📁</span>Archives</button>
     </div>
-
     <div class="content" id="main-content">
-      <!-- Welcome Screen -->
       <div class="screen welcome-screen active" id="welcome-screen">
         <h1 class="welcome-title">HuntR</h1>
         <p class="welcome-subtitle">Track your hunting party in real-time</p>
         <button class="welcome-btn primary" id="btn-create-party">Create Party</button>
         <button class="welcome-btn secondary" id="btn-join-party">Join Party</button>
       </div>
-
-      <!-- Create Party Screen -->
       <div class="screen form-screen" id="create-screen">
         <h2 class="form-title">Create a Party</h2>
-        <div class="form-group">
-          <label>Party Name (e.g., BUCK)</label>
-          <input type="text" class="form-input" id="create-prefix" placeholder="Enter name" maxlength="8" autocomplete="off">
-        </div>
-        <div class="form-group">
-          <label>Your Name</label>
-          <input type="text" class="form-input" id="create-name" placeholder="Enter your name" maxlength="20" autocomplete="off">
-        </div>
-        <div class="form-group">
-          <label>Pick a Color</label>
-          <div class="color-picker" id="create-colors"></div>
-        </div>
+        <div class="form-group"><label>Party Name (e.g., BUCK)</label><input type="text" class="form-input" id="create-prefix" placeholder="Enter name" maxlength="8" autocomplete="off"></div>
+        <div class="form-group"><label>Your Name</label><input type="text" class="form-input" id="create-name" placeholder="Enter your name" maxlength="20" autocomplete="off"></div>
+        <div class="form-group"><label>Pick a Color</label><div class="color-picker" id="create-colors"></div></div>
         <button class="welcome-btn primary" id="btn-do-create">Create Party</button>
         <button class="welcome-btn secondary" id="btn-create-back">Back</button>
       </div>
-
-      <!-- Join Party Screen -->
       <div class="screen form-screen" id="join-screen">
         <h2 class="form-title">Join a Party</h2>
-        <div class="form-group">
-          <label>Invite Code</label>
-          <input type="text" class="form-input" id="join-code" placeholder="Enter code" maxlength="20" autocomplete="off" style="text-transform: uppercase;">
-        </div>
-        <div class="form-group">
-          <label>Your Name</label>
-          <input type="text" class="form-input" id="join-name" placeholder="Enter your name" maxlength="20" autocomplete="off">
-        </div>
-        <div class="form-group">
-          <label>Pick a Color</label>
-          <div class="color-picker" id="join-colors"></div>
-        </div>
+        <div class="form-group"><label>Your Name</label><input type="text" class="form-input" id="join-name" placeholder="Enter your name" maxlength="20" autocomplete="off"></div>
+        <div class="form-group"><label>Party Code (from creator)</label><input type="text" class="form-input" id="join-code" placeholder="Enter party code" maxlength="20" autocomplete="off" style="text-transform: uppercase;"></div>
+        <div class="form-group"><label>Pick a Color</label><div class="color-picker" id="join-colors"></div></div>
         <button class="welcome-btn primary" id="btn-do-join">Join Party</button>
         <button class="welcome-btn secondary" id="btn-join-back">Back</button>
       </div>
-
-      <!-- Map Screen -->
-      <div class="screen" id="map-screen">
-        <div id="map"></div>
+      <div class="screen" id="map-screen"><div id="map"></div>
         <div class="map-controls">
           <button class="map-btn" id="btn-center-map">📍</button>
           <button class="map-btn" id="btn-add-pin">➕</button>
         </div>
       </div>
-
-      <!-- Chat Screen -->
       <div class="screen" id="chat-screen">
         <div class="party-info hidden" id="chat-party-info">
           <div class="invite-code" id="chat-invite-code"></div>
@@ -692,516 +153,431 @@
           <button class="chat-btn" id="btn-send">➤</button>
         </div>
       </div>
-
-      <!-- Archives Screen -->
-      <div class="screen" id="archives-screen">
-        <div class="archives-list" id="archives-list"></div>
-      </div>
+      <div class="screen" id="archives-screen"><div class="archives-list" id="archives-list"></div></div>
     </div>
-
-    <!-- Pin Modal -->
     <div class="modal" id="pin-modal">
       <div class="modal-content">
-        <div class="modal-header">
-          <h3 class="modal-title">Create Pin</h3>
-          <button class="modal-close" id="btn-close-pin">✕</button>
-        </div>
+        <div class="modal-header"><h3 class="modal-title">Create Pin</h3><button class="modal-close" id="btn-close-pin">✕</button></div>
         <div class="pin-types">
-          <button class="pin-type selected" data-type="observation">
-            <span class="pin-type-icon">👁</span>
-            <span class="pin-type-label">Observation</span>
-          </button>
-          <button class="pin-type" data-type="landmark">
-            <span class="pin-type-icon">📍</span>
-            <span class="pin-type-label">Landmark</span>
-          </button>
-          <button class="pin-type" data-type="game_sighting">
-            <span class="pin-type-icon">🦌</span>
-            <span class="pin-type-label">Game</span>
-          </button>
+          <button class="pin-type selected" data-type="observation"><span class="pin-type-icon">👁</span><span class="pin-type-label">Observation</span></button>
+          <button class="pin-type" data-type="landmark"><span class="pin-type-icon">📍</span><span class="pin-type-label">Landmark</span></button>
+          <button class="pin-type" data-type="game_sighting"><span class="pin-type-icon">🦌</span><span class="pin-type-label">Game</span></button>
         </div>
         <textarea class="modal-textarea" id="pin-text" placeholder="Add notes..."></textarea>
         <button class="modal-btn" id="btn-save-pin">Save Pin</button>
       </div>
     </div>
-
-    <!-- Loading -->
-    <div class="loading-overlay" id="loading-overlay">
-      <div class="spinner"></div>
-      <p>Loading...</p>
-    </div>
+    <div class="loading-overlay" id="loading-overlay"><div class="spinner"></div><p id="loading-text">Connecting...</p></div>
   </div>
-
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
-    const COLORS = [
-      '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4',
-      '#FFEAA7', '#DDA0DD', '#98D8C8', '#F8DC6F'
-    ];
+const COLORS = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#98D8C8', '#F8DC6F'];
+const PIN_TYPES = { observation: { icon: '👁', label: 'Observation' }, landmark: { icon: '📍', label: 'Landmark' }, game_sighting: { icon: '🦌', label: 'Game' } };
+const INVITE_SUFFIXES = ['ALPHA', 'BRAVO', 'CHARLIE', 'DELTA', 'ECHO'];
 
-    const PIN_TYPES = {
-      observation: { icon: '👁', label: 'Observation' },
-      landmark: { icon: '📍', label: 'Landmark' },
-      game_sighting: { icon: '🦌', label: 'Game' }
-    };
+class P2PManager {
+  constructor() {
+    this.peer = null;
+    this.connections = new Map();
+    this.onMessage = null;
+    this.onConnected = null;
+    this.onDisconnected = null;
+  }
 
-    const state = {
-      memberId: null,
-      memberName: null,
-      memberColor: null,
-      inviteCode: null,
-      partyActive: false,
-      members: new Map(),
-      pins: [],
-      messages: [],
-      archives: [],
-      currentTab: 'map',
-      selectedPinType: 'observation',
-      pendingPinLocation: null,
-      map: null,
-      memberMarkers: new Map(),
-      pinMarkers: []
-    };
-
-    function init() {
-      loadFromStorage();
-      setupColorPickers();
-      setupEventListeners();
-      setupColorPicker(document.getElementById('create-colors'), 'create-color');
-      setupColorPicker(document.getElementById('join-colors'), 'join-color');
-    }
-
-    function loadFromStorage() {
-      const archives = localStorage.getItem('huntr_archives');
-      if (archives) {
-        state.archives = JSON.parse(archives);
-      }
-    }
-
-    function saveArchives() {
-      localStorage.setItem('huntr_archives', JSON.stringify(state.archives));
-    }
-
-    function setupColorPickers() {
-      setupColorPicker(document.getElementById('create-colors'), 'create-color');
-      setupColorPicker(document.getElementById('join-colors'), 'join-color');
-    }
-
-    function setupColorPicker(container, name) {
-      COLORS.forEach((color, i) => {
-        const btn = document.createElement('button');
-        btn.className = 'color-option' + (i === 0 ? ' selected' : '');
-        btn.style.backgroundColor = color;
-        btn.dataset.color = color;
-        btn.onclick = () => {
-          container.querySelectorAll('.color-option').forEach(o => o.classList.remove('selected'));
-          btn.classList.add('selected');
-        };
-        container.appendChild(btn);
+  async createParty(inviteCode) {
+    return new Promise((resolve, reject) => {
+      const peerId = inviteCode.replace(/[^A-Z0-9]/gi, '').toUpperCase().substring(0, 12);
+      this.peer = new Peer(peerId, { debug: 1 });
+      this.peer.on('open', (id) => {
+        console.log('Created peer with ID:', id);
+        this.setupConnectionHandler();
+        this.updateStatus('connected');
+        if (this.onConnected) this.onConnected();
+        resolve();
       });
-    }
-
-    function setupEventListeners() {
-      document.getElementById('btn-create-party').onclick = () => showScreen('create');
-      document.getElementById('btn-join-party').onclick = () => showScreen('join');
-      document.getElementById('btn-create-back').onclick = () => showScreen('welcome');
-      document.getElementById('btn-join-back').onclick = () => showScreen('welcome');
-
-      document.getElementById('btn-do-create').onclick = createParty;
-      document.getElementById('btn-do-join').onclick = joinParty;
-
-      document.querySelectorAll('.tab').forEach(tab => {
-        tab.onclick = () => switchTab(tab.dataset.tab);
-      });
-
-      document.getElementById('btn-end-hunt').onclick = endHunt;
-      document.getElementById('btn-center-map').onclick = centerOnLocation;
-      document.getElementById('btn-add-pin').onclick = showAddPinModal;
-      document.getElementById('btn-close-pin').onclick = closePinModal;
-      document.getElementById('btn-save-pin').onclick = savePin;
-
-      document.querySelectorAll('.pin-type').forEach(btn => {
-        btn.onclick = () => {
-          document.querySelectorAll('.pin-type').forEach(b => b.classList.remove('selected'));
-          btn.classList.add('selected');
-          state.selectedPinType = btn.dataset.type;
-        };
-      });
-
-      document.getElementById('btn-send').onclick = sendMessage;
-      document.getElementById('chat-input').onkeypress = (e) => {
-        if (e.key === 'Enter') sendMessage();
-      };
-
-      document.addEventListener('keypress', (e) => {
-        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-        if (e.key === 'm') switchTab('map');
-        if (e.key === 'c') switchTab('chat');
-      });
-    }
-
-    function showScreen(name) {
-      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-      document.getElementById(name + '-screen').classList.add('active');
-
-      if (name === 'map' && state.map) {
-        setTimeout(() => state.map.invalidateSize(), 100);
-      }
-    }
-
-    function switchTab(tab) {
-      state.currentTab = tab;
-      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-      document.querySelector(`.tab[data-tab="${tab}"]`).classList.add('active');
-
-      if (tab === 'map') {
-        showScreen('map');
-        if (state.map) setTimeout(() => state.map.invalidateSize(), 100);
-      } else if (tab === 'chat') {
-        showScreen('chat');
-      } else if (tab === 'archives') {
-        showScreen('archives');
-        renderArchives();
-      }
-    }
-
-    function createParty() {
-      const prefix = document.getElementById('create-prefix').value.trim().toUpperCase();
-      const name = document.getElementById('create-name').value.trim();
-      const color = document.querySelector('#create-colors .color-option.selected')?.dataset.color || COLORS[0];
-
-      if (prefix.length < 3) {
-        alert('Party name must be at least 3 characters');
-        return;
-      }
-      if (!name) {
-        alert('Please enter your name');
-        return;
-      }
-
-      const year = new Date().getFullYear();
-      const suffixes = ['ALPHA', 'BRAVO', 'CHARLIE', 'DELTA', 'ECHO'];
-      const suffix = suffixes[Math.floor(Math.random() * suffixes.length)];
-      const inviteCode = `${prefix}-${year}-${suffix}`;
-
-      state.memberId = Date.now().toString(36);
-      state.memberName = name;
-      state.memberColor = color;
-      state.inviteCode = inviteCode;
-      state.partyActive = true;
-      state.members.clear();
-      state.pins = [];
-      state.messages = [];
-
-      const member = {
-        id: state.memberId,
-        name: name,
-        color: color,
-        latitude: 39.8283,
-        longitude: -98.5795
-      };
-      state.members.set(state.memberId, member);
-
-      activatePartyUI();
-      initMap();
-    }
-
-    function joinParty() {
-      const code = document.getElementById('join-code').value.trim().toUpperCase();
-      const name = document.getElementById('join-name').value.trim();
-      const color = document.querySelector('#join-colors .color-option.selected')?.dataset.color || COLORS[0];
-
-      if (code.length < 5) {
-        alert('Please enter a valid invite code');
-        return;
-      }
-      if (!name) {
-        alert('Please enter your name');
-        return;
-      }
-
-      state.memberId = Date.now().toString(36);
-      state.memberName = name;
-      state.memberColor = color;
-      state.inviteCode = code;
-      state.partyActive = true;
-      state.members.clear();
-      state.pins = [];
-      state.messages = [];
-
-      const member = {
-        id: state.memberId,
-        name: name,
-        color: color,
-        latitude: 39.8283,
-        longitude: -98.5795
-      };
-      state.members.set(state.memberId, member);
-
-      activatePartyUI();
-      initMap();
-    }
-
-    function activatePartyUI() {
-      document.getElementById('app-header').classList.remove('hidden');
-      document.getElementById('tab-bar').classList.remove('hidden');
-      document.getElementById('chat-party-info').classList.remove('hidden');
-      document.getElementById('chat-invite-code').textContent = state.inviteCode;
-
-      updateMemberCount();
-      switchTab('map');
-    }
-
-    function endHunt() {
-      if (!confirm('End this hunt? All data will be archived.')) return;
-
-      const archive = {
-        id: Date.now().toString(36),
-        name: state.inviteCode,
-        date: new Date().toLocaleDateString(),
-        members: Array.from(state.members.values()),
-        pins: state.pins,
-        messages: state.messages
-      };
-
-      state.archives.unshift(archive);
-      saveArchives();
-
-      state.partyActive = false;
-      state.members.clear();
-      state.pins = [];
-      state.messages = [];
-
-      document.getElementById('app-header').classList.add('hidden');
-      document.getElementById('tab-bar').classList.add('hidden');
-      document.getElementById('chat-party-info').classList.add('hidden');
-      clearMap();
-      showScreen('welcome');
-    }
-
-    function initMap() {
-      if (state.map) {
-        state.map.remove();
-      }
-
-      state.map = L.map('map').setView([39.8283, -98.5795], 5);
-
-      L.tileLayer('https://tile.opentopomap.org/{z}/{x}/{y}.png', {
-        maxZoom: 17,
-        attribution: '© OpenTopoMap'
-      }).addTo(state.map);
-
-      state.map.on('contextmenu', (e) => {
-        if (state.partyActive) {
-          state.pendingPinLocation = e.latlng;
-          showAddPinModal();
+      this.peer.on('error', (err) => {
+        console.error('Peer creation error:', err);
+        if (err.type === 'unavailable-id') {
+          resolve();
+        } else {
+          reject(err);
         }
       });
+    });
+  }
 
-      updateMapMarkers();
-      centerOnLocation();
-    }
-
-    function clearMap() {
-      if (state.map) {
-        state.map.remove();
-        state.map = null;
-      }
-      state.memberMarkers.clear();
-      state.pinMarkers = [];
-    }
-
-    function updateMapMarkers() {
-      state.memberMarkers.forEach(m => state.map.removeLayer(m));
-      state.memberMarkers.clear();
-
-      state.members.forEach((member, id) => {
-        const icon = L.divIcon({
-          className: 'member-marker',
-          html: `
-            <div class="member-avatar" style="background-color: ${member.color}">
-              ${member.name.substring(0, 2).toUpperCase()}
-            </div>
-            <div class="member-label">${member.name}</div>
-          `,
-          iconSize: [60, 70],
-          iconAnchor: [30, 70]
-        });
-
-        const marker = L.marker([member.latitude, member.longitude], { icon })
-          .addTo(state.map);
-
-        state.memberMarkers.set(id, marker);
-      });
-
-      state.pinMarkers.forEach(m => state.map.removeLayer(m));
-      state.pinMarkers = [];
-
-      state.pins.forEach(pin => {
-        const icon = L.divIcon({
-          className: 'pin-marker',
-          html: PIN_TYPES[pin.type]?.icon || '📍',
-          iconSize: [32, 32],
-          iconAnchor: [16, 32]
-        });
-
-        const marker = L.marker([pin.latitude, pin.longitude], { icon })
-          .addTo(state.map);
-
-        marker.bindPopup(`<b>${PIN_TYPES[pin.type]?.label}</b><br>${pin.text || ''}<br><small>${pin.creatorName}</small>`);
-
-        state.pinMarkers.push(marker);
-      });
-    }
-
-    function centerOnLocation() {
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          (pos) => {
-            const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-            state.map.setView(loc, 14);
-
-            const member = state.members.get(state.memberId);
-            if (member) {
-              member.latitude = loc.lat;
-              member.longitude = loc.lng;
+  async joinParty(inviteCode) {
+    return new Promise((resolve, reject) => {
+      const hostId = inviteCode.replace(/[^A-Z0-9]/gi, '').toUpperCase().substring(0, 12);
+      const myId = 'hunter-' + Date.now().toString(36);
+      this.peer = new Peer(myId, { debug: 1 });
+      this.peer.on('open', () => {
+        console.log('Joined as peer:', myId);
+        this.setupConnectionHandler();
+        let attempts = 0;
+        const maxAttempts = 5;
+        const tryConnect = () => {
+          attempts++;
+          console.log(`Connection attempt ${attempts}/${maxAttempts} to ${hostId}`);
+          const conn = this.peer.connect(hostId, { reliable: true, serialization: 'json' });
+          conn.on('open', () => {
+            console.log('Connected to host');
+            this.connections.set(hostId, conn);
+            this.setupDataHandler(conn);
+            this.updateStatus('connected');
+            if (this.onConnected) this.onConnected();
+            resolve();
+          });
+          conn.on('error', (err) => {
+            console.error('Connection error:', err);
+            if (attempts < maxAttempts) {
+              console.log('Retrying in 2 seconds...');
+              setTimeout(tryConnect, 2000);
+            } else {
+              reject(err);
             }
-            updateMapMarkers();
-          },
-          (err) => console.log('Location error:', err)
-        );
-      }
-    }
+          });
+        };
+        setTimeout(tryConnect, 2000);
+      });
+      this.peer.on('error', (err) => {
+        console.error('Peer error:', err);
+        reject(err);
+      });
+    });
+  }
 
-    function showAddPinModal() {
-      document.getElementById('pin-modal').classList.add('active');
-      document.getElementById('pin-text').value = '';
-    }
+  setupConnectionHandler() {
+    this.peer.on('connection', (conn) => {
+      console.log('Incoming connection from:', conn.peer);
+      conn.on('open', () => {
+        this.connections.set(conn.peer, conn);
+        this.setupDataHandler(conn);
+      });
+    });
+  }
 
-    function closePinModal() {
-      document.getElementById('pin-modal').classList.remove('active');
-      state.pendingPinLocation = null;
-    }
+  setupDataHandler(conn) {
+    conn.on('data', (data) => {
+      console.log('Received data:', data.type);
+      if (this.onMessage) this.onMessage(data);
+    });
+    conn.on('close', () => {
+      this.connections.delete(conn.peer);
+      console.log('Connection closed:', conn.peer);
+    });
+  }
 
-    function savePin() {
-      const text = document.getElementById('pin-text').value.trim();
-      const pin = {
-        id: Date.now().toString(36),
-        type: state.selectedPinType,
-        latitude: state.pendingPinLocation?.lat || 39.8283,
-        longitude: state.pendingPinLocation?.lng || -98.5795,
-        text,
-        creatorId: state.memberId,
-        creatorName: state.memberName,
-        timestamp: Date.now()
+  broadcast(data) {
+    const message = JSON.stringify(data);
+    this.connections.forEach((conn) => {
+      if (conn.open) conn.send(message);
+    });
+  }
+
+  send(data) {
+    this.broadcast(data);
+  }
+
+  updateStatus(status) {
+    const dot = document.getElementById('status-dot');
+    const text = document.getElementById('status-text');
+    dot.className = 'status-dot ' + status;
+    text.textContent = status === 'connected' ? 'Connected' : status === 'connecting' ? 'Connecting...' : 'Offline';
+  }
+
+  destroy() {
+    if (this.peer) this.peer.destroy();
+    this.connections.clear();
+  }
+}
+
+const state = {
+  memberId: null, memberName: null, memberColor: null, inviteCode: null,
+  partyActive: false, isCreator: false, members: new Map(), pins: [], messages: [],
+  archives: [], currentTab: 'map', selectedPinType: 'observation',
+  pendingPinLocation: null, map: null, memberMarkers: new Map(), pinMarkers: [],
+  p2p: new P2PManager()
+};
+
+function init() {
+  loadFromStorage();
+  setupColorPickers();
+  setupEventListeners();
+  setupP2P();
+}
+
+function loadFromStorage() {
+  const archives = localStorage.getItem('huntr_archives');
+  if (archives) state.archives = JSON.parse(archives);
+}
+
+function saveArchives() { localStorage.setItem('huntr_archives', JSON.stringify(state.archives)); }
+
+function setupColorPickers() {
+  ['create', 'join'].forEach(prefix => {
+    const container = document.getElementById(prefix + '-colors');
+    COLORS.forEach((color, i) => {
+      const btn = document.createElement('button');
+      btn.className = 'color-option' + (i === 0 ? ' selected' : '');
+      btn.style.backgroundColor = color;
+      btn.onclick = () => {
+        container.querySelectorAll('.color-option').forEach(o => o.classList.remove('selected'));
+        btn.classList.add('selected');
       };
+      container.appendChild(btn);
+    });
+  });
+}
 
-      state.pins.push(pin);
+function setupEventListeners() {
+  document.getElementById('btn-create-party').onclick = () => showScreen('create');
+  document.getElementById('btn-join-party').onclick = () => showScreen('join');
+  document.getElementById('btn-create-back').onclick = () => showScreen('welcome');
+  document.getElementById('btn-join-back').onclick = () => showScreen('welcome');
+  document.getElementById('btn-do-create').onclick = createParty;
+  document.getElementById('btn-do-join').onclick = joinParty;
+  document.querySelectorAll('.tab').forEach(tab => tab.onclick = () => switchTab(tab.dataset.tab));
+  document.getElementById('btn-end-hunt').onclick = endHunt;
+  document.getElementById('btn-center-map').onclick = centerOnLocation;
+  document.getElementById('btn-add-pin').onclick = showAddPinModal;
+  document.getElementById('btn-close-pin').onclick = closePinModal;
+  document.getElementById('btn-save-pin').onclick = savePin;
+  document.querySelectorAll('.pin-type').forEach(btn => {
+    btn.onclick = () => {
+      document.querySelectorAll('.pin-type').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      state.selectedPinType = btn.dataset.type;
+    };
+  });
+  document.getElementById('btn-send').onclick = sendMessage;
+  document.getElementById('chat-input').onkeypress = (e) => { if (e.key === 'Enter') sendMessage(); };
+}
+
+function setupP2P() {
+  state.p2p.onMessage = handleP2PMessage;
+  state.p2p.onConnected = () => {
+    state.p2p.send({ type: 'member:join', data: { id: state.memberId, name: state.memberName, color: state.memberColor } });
+    if (navigator.geolocation) {
+      navigator.geolocation.watchPosition((pos) => {
+        if (state.partyActive) {
+          state.p2p.send({ type: 'location:update', data: { id: state.memberId, lat: pos.coords.latitude, lng: pos.coords.longitude } });
+        }
+      });
+    }
+  };
+}
+
+function handleP2PMessage(msg) {
+  const data = typeof msg === 'string' ? JSON.parse(msg) : msg;
+  console.log('P2P message:', data.type);
+  switch (data.type) {
+    case 'member:join':
+      state.members.set(data.data.id, data.data);
       updateMapMarkers();
-      closePinModal();
-    }
-
-    function sendMessage() {
-      const input = document.getElementById('chat-input');
-      const content = input.value.trim();
-      if (!content) return;
-
-      const message = {
-        id: Date.now().toString(36),
-        senderId: state.memberId,
-        senderName: state.memberName,
-        content,
-        timestamp: Date.now()
-      };
-
-      state.messages.push(message);
+      updateMemberCount();
+      break;
+    case 'location:update':
+      const member = state.members.get(data.data.id);
+      if (member) { member.lat = data.data.lat; member.lng = data.data.lng; }
+      if (data.data.id !== state.memberId) updateMapMarkers();
+      break;
+    case 'pin:create':
+      state.pins.push(data.data);
+      updateMapMarkers();
+      break;
+    case 'chat:message':
+      state.messages.push(data.data);
       renderMessages();
-      input.value = '';
-    }
+      break;
+  }
+}
 
-    function renderMessages() {
-      const container = document.getElementById('chat-messages');
-      container.innerHTML = '';
+function showScreen(name) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(name + '-screen').classList.add('active');
+  if (name === 'map' && state.map) setTimeout(() => state.map.invalidateSize(), 100);
+}
 
-      state.messages.forEach(msg => {
-        const div = document.createElement('div');
-        div.className = 'chat-message' + (msg.senderId === state.memberId ? ' own' : '');
-        div.innerHTML = `
-          <div class="chat-sender">${msg.senderId === state.memberId ? 'You' : msg.senderName}</div>
-          <div class="chat-content">${msg.content}</div>
-          <div class="chat-time">${new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
-        `;
-        container.appendChild(div);
-      });
+function switchTab(tab) {
+  state.currentTab = tab;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelector(`.tab[data-tab="${tab}"]`).classList.add('active');
+  if (tab === 'map') { showScreen('map'); if (state.map) setTimeout(() => state.map.invalidateSize(), 100); }
+  else if (tab === 'chat') showScreen('chat');
+  else if (tab === 'archives') { showScreen('archives'); renderArchives(); }
+}
 
-      container.scrollTop = container.scrollHeight;
-    }
+async function createParty() {
+  const prefix = document.getElementById('create-prefix').value.trim().toUpperCase();
+  const name = document.getElementById('create-name').value.trim();
+  const color = document.querySelector('#create-colors .color-option.selected')?.style.backgroundColor || COLORS[0];
+  if (prefix.length < 3) { alert('Party name must be at least 3 characters'); return; }
+  if (!name) { alert('Please enter your name'); return; }
+  const year = new Date().getFullYear();
+  const suffix = INVITE_SUFFIXES[Math.floor(Math.random() * INVITE_SUFFIXES.length)];
+  state.inviteCode = `${prefix}-${year}-${suffix}`;
+  state.memberId = 'host-' + Date.now().toString(36);
+  state.memberName = name; state.memberColor = color;
+  state.isCreator = true; state.partyActive = true;
+  state.members.clear(); state.pins = []; state.messages = [];
+  state.members.set(state.memberId, { id: state.memberId, name: name, color: color, lat: 39.8283, lng: -98.5795 });
+  showLoading('Creating party...');
+  try {
+    await state.p2p.createParty(state.inviteCode);
+    hideLoading();
+    activatePartyUI();
+    initMap();
+  } catch (err) { hideLoading(); alert('Failed to create party: ' + err.message); }
+}
 
-    function updateMemberCount() {
-      document.getElementById('chat-member-count').textContent =
-        `${state.members.size} member${state.members.size > 1 ? 's' : ''}`;
-    }
+async function joinParty() {
+  const code = document.getElementById('join-code').value.trim().toUpperCase();
+  const name = document.getElementById('join-name').value.trim();
+  const color = document.querySelector('#join-colors .color-option.selected')?.style.backgroundColor || COLORS[0];
+  if (code.length < 5) { alert('Please enter a valid party code'); return; }
+  if (!name) { alert('Please enter your name'); return; }
+  state.inviteCode = code;
+  state.memberId = 'hunter-' + Date.now().toString(36);
+  state.memberName = name; state.memberColor = color;
+  state.isCreator = false; state.partyActive = true;
+  state.members.clear(); state.pins = []; state.messages = [];
+  state.members.set(state.memberId, { id: state.memberId, name: name, color: color, lat: 39.8283, lng: -98.5795 });
+  showLoading('Joining party...');
+  try {
+    await state.p2p.joinParty(state.inviteCode);
+    hideLoading();
+    activatePartyUI();
+    initMap();
+    state.p2p.send({ type: 'member:join', data: { id: state.memberId, name: state.memberName, color: state.memberColor } });
+  } catch (err) { hideLoading(); alert('Failed to join party: ' + err.message); }
+}
 
-    function renderArchives() {
-      const container = document.getElementById('archives-list');
+function activatePartyUI() {
+  document.getElementById('app-header').classList.remove('hidden');
+  document.getElementById('tab-bar').classList.remove('hidden');
+  document.getElementById('chat-party-info').classList.remove('hidden');
+  document.getElementById('chat-invite-code').textContent = state.inviteCode;
+  document.getElementById('chat-invite-code').style.cursor = 'pointer';
+  document.getElementById('chat-invite-code').onclick = () => {
+    navigator.clipboard.writeText(state.inviteCode);
+    alert('Party code copied! Share it with others.');
+  };
+  updateMemberCount();
+  switchTab('map');
+}
 
-      if (state.archives.length === 0) {
-        container.innerHTML = `
-          <div class="empty-state">
-            <div class="empty-icon">📁</div>
-            <p>No Archives Yet</p>
-            <p style="font-size: 14px; margin-top: 8px;">When you end a hunt, it will be saved here</p>
-          </div>
-        `;
-        return;
-      }
+function endHunt() {
+  if (!confirm('End this hunt? All data will be archived.')) return;
+  const archive = { id: Date.now().toString(36), name: state.inviteCode, date: new Date().toLocaleDateString(), members: Array.from(state.members.values()), pins: state.pins, messages: state.messages };
+  state.archives.unshift(archive);
+  saveArchives();
+  state.p2p.destroy();
+  state.partyActive = false;
+  state.members.clear(); state.pins = []; state.messages = [];
+  state.p2p = new P2PManager();
+  setupP2P();
+  document.getElementById('app-header').classList.add('hidden');
+  document.getElementById('tab-bar').classList.add('hidden');
+  document.getElementById('chat-party-info').classList.add('hidden');
+  clearMap(); showScreen('welcome');
+}
 
-      container.innerHTML = state.archives.map(archive => `
-        <div class="archive-card">
-          <div class="archive-name">${archive.name}</div>
-          <div class="archive-meta">${archive.date}</div>
-          <div class="archive-stats">
-            <div class="archive-stat">
-              <div class="archive-stat-value">${archive.members.length}</div>
-              <div class="archive-stat-label">Members</div>
-            </div>
-            <div class="archive-stat">
-              <div class="archive-stat-value">${archive.pins.length}</div>
-              <div class="archive-stat-label">Pins</div>
-            </div>
-            <div class="archive-stat">
-              <div class="archive-stat-value">${archive.messages.length}</div>
-              <div class="archive-stat-label">Messages</div>
-            </div>
-          </div>
-          <button class="archive-share-btn" onclick="shareArchive('${archive.id}')">Share Archive</button>
-        </div>
-      `).join('');
-    }
+function initMap() {
+  if (state.map) state.map.remove();
+  state.map = L.map('map').setView([39.8283, -98.5795], 5);
+  L.tileLayer('https://tile.opentopomap.org/{z}/{x}/{y}.png', { maxZoom: 17, attribution: '© OpenTopoMap' }).addTo(state.map);
+  state.map.on('contextmenu', (e) => { if (state.partyActive) { state.pendingPinLocation = e.latlng; showAddPinModal(); } });
+  updateMapMarkers();
+  centerOnLocation();
+}
 
-    function shareArchive(id) {
-      const archive = state.archives.find(a => a.id === id);
-      if (!archive) return;
+function clearMap() { if (state.map) { state.map.remove(); state.map = null; } state.memberMarkers.clear(); state.pinMarkers = []; }
 
-      const text = `Hunt Archive: ${archive.name}\n${archive.date}\nMembers: ${archive.members.length}\nPins: ${archive.pins.length}\nMessages: ${archive.messages.length}`;
+function updateMapMarkers() {
+  if (!state.map) return;
+  state.memberMarkers.forEach(m => state.map.removeLayer(m));
+  state.memberMarkers.clear();
+  state.members.forEach((member, id) => {
+    const icon = L.divIcon({ className: 'member-marker', html: `<div style="width:36px;height:36px;border-radius:50%;background:${member.color};display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:14px;color:white;border:3px solid white;">${member.name.substring(0,2).toUpperCase()}</div><div style="background:white;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;margin-top:4px;white-space:nowrap;">${member.name}</div>`, iconSize: [60, 70], iconAnchor: [30, 70] });
+    const marker = L.marker([member.lat || 39.8283, member.lng || -98.5795], { icon }).addTo(state.map);
+    state.memberMarkers.set(id, marker);
+  });
+  state.pinMarkers.forEach(m => state.map.removeLayer(m));
+  state.pinMarkers = [];
+  state.pins.forEach(pin => {
+    const icon = L.divIcon({ className: 'pin-marker', html: PIN_TYPES[pin.type]?.icon || '📍', iconSize: [32, 32], iconAnchor: [16, 32] });
+    const marker = L.marker([pin.latitude, pin.longitude], { icon }).addTo(state.map);
+    marker.bindPopup(`<b>${PIN_TYPES[pin.type]?.label}</b><br>${pin.text || ''}<br><small>${pin.creatorName}</small>`);
+    state.pinMarkers.push(marker);
+  });
+}
 
-      if (navigator.share) {
-        navigator.share({ text });
-      } else {
-        prompt('Copy this archive info:', text);
-      }
-    }
+function centerOnLocation() {
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition((pos) => {
+      state.map.setView([pos.coords.latitude, pos.coords.longitude], 14);
+      const member = state.members.get(state.memberId);
+      if (member) { member.lat = pos.coords.latitude; member.lng = pos.coords.longitude; }
+      updateMapMarkers();
+    }, (err) => console.log('Location error:', err));
+  }
+}
 
-    init();
+function showAddPinModal() { document.getElementById('pin-modal').classList.add('active'); document.getElementById('pin-text').value = ''; }
+function closePinModal() { document.getElementById('pin-modal').classList.remove('active'); state.pendingPinLocation = null; }
 
-    // Register Service Worker for PWA
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('sw.js')
-          .then(reg => console.log('SW registered:', reg.scope))
-          .catch(err => console.log('SW registration failed:', err));
-      });
-    }
+function savePin() {
+  const text = document.getElementById('pin-text').value.trim();
+  const pin = { id: Date.now().toString(36), type: state.selectedPinType, latitude: state.pendingPinLocation?.lat || 39.8283, longitude: state.pendingPinLocation?.lng || -98.5795, text, creatorId: state.memberId, creatorName: state.memberName, timestamp: Date.now() };
+  state.pins.push(pin);
+  state.p2p.send({ type: 'pin:create', data: pin });
+  updateMapMarkers();
+  closePinModal();
+}
+
+function sendMessage() {
+  const input = document.getElementById('chat-input');
+  const content = input.value.trim();
+  if (!content) return;
+  const message = { id: Date.now().toString(36), senderId: state.memberId, senderName: state.memberName, content, timestamp: Date.now() };
+  state.messages.push(message);
+  state.p2p.send({ type: 'chat:message', data: message });
+  renderMessages();
+  input.value = '';
+}
+
+function renderMessages() {
+  const container = document.getElementById('chat-messages');
+  container.innerHTML = '';
+  state.messages.forEach(msg => {
+    const div = document.createElement('div');
+    div.className = 'chat-message' + (msg.senderId === state.memberId ? ' own' : '');
+    div.innerHTML = `<div class="chat-sender">${msg.senderId === state.memberId ? 'You' : msg.senderName}</div><div class="chat-content">${msg.content}</div><div class="chat-time">${new Date(msg.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</div>`;
+    container.appendChild(div);
+  });
+  container.scrollTop = container.scrollHeight;
+}
+
+function updateMemberCount() { document.getElementById('chat-member-count').textContent = `${state.members.size} member${state.members.size > 1 ? 's' : ''}`; }
+
+function renderArchives() {
+  const container = document.getElementById('archives-list');
+  if (state.archives.length === 0) { container.innerHTML = '<div class="empty-state"><div class="empty-icon">📁</div><p>No Archives Yet</p><p style="font-size:14px;margin-top:8px;">When you end a hunt, it will be saved here</p></div>'; return; }
+  container.innerHTML = state.archives.map(archive => `<div class="archive-card"><div class="archive-name">${archive.name}</div><div class="archive-meta">${archive.date}</div><div class="archive-stats"><div class="archive-stat"><div class="archive-stat-value">${archive.members.length}</div><div class="archive-stat-label">Members</div></div><div class="archive-stat"><div class="archive-stat-value">${archive.pins.length}</div><div class="archive-stat-label">Pins</div></div><div class="archive-stat"><div class="archive-stat-value">${archive.messages.length}</div><div class="archive-stat-label">Messages</div></div></div><button class="archive-share-btn" onclick="shareArchive('${archive.id}')">Share Archive</button></div>`).join('');
+}
+
+function shareArchive(id) {
+  const archive = state.archives.find(a => a.id === id);
+  if (!archive) return;
+  const text = `Hunt: ${archive.name}\n${archive.date}\nMembers: ${archive.members.length}\nPins: ${archive.pins.length}\nMessages: ${archive.messages.length}`;
+  if (navigator.share) navigator.share({ text }); else prompt('Copy:', text);
+}
+
+function showLoading(text) { document.getElementById('loading-overlay').classList.add('active'); document.getElementById('loading-text').textContent = text || 'Loading...'; }
+function hideLoading() { document.getElementById('loading-overlay').classList.remove('active'); }
+
+init();
   </script>
 </body>
 </html>
