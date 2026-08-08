@@ -60,6 +60,7 @@
     .chat-sender { font-size: 11px; color: var(--primary-light); margin-bottom: 4px; }
     .chat-message.own .chat-sender { color: rgba(255,255,255,0.7); }
     .chat-content { font-size: 15px; line-height: 1.4; }
+    .chat-attachment { max-width: 200px; max-height: 150px; border-radius: 8px; margin-top: 8px; cursor: pointer; }
     .chat-time { font-size: 10px; color: var(--text-secondary); margin-top: 4px; text-align: right; }
     .chat-input-area { display: flex; gap: 8px; padding: 12px; background: var(--surface); border-top: 1px solid var(--surface-light); }
     .chat-input { flex: 1; padding: 12px 16px; border: none; border-radius: 20px; background: var(--background); color: var(--text); font-size: 16px; }
@@ -149,6 +150,7 @@
         <div class="chat-messages" id="chat-messages"></div>
         <div class="chat-input-area">
           <button class="chat-btn" id="btn-attach">📎</button>
+          <input type="file" id="chat-file-input" accept="image/*" style="display:none;">
           <input type="text" class="chat-input" id="chat-input" placeholder="Type a message...">
           <button class="chat-btn" id="btn-send">➤</button>
         </div>
@@ -352,6 +354,8 @@ function setupEventListeners() {
   });
   document.getElementById('btn-send').onclick = sendMessage;
   document.getElementById('chat-input').onkeypress = (e) => { if (e.key === 'Enter') sendMessage(); };
+  document.getElementById('btn-attach').onclick = () => document.getElementById('chat-file-input').click();
+  document.getElementById('chat-file-input').onchange = handleFileSelect;
 }
 
 function setupP2P() {
@@ -536,15 +540,31 @@ function savePin() {
   closePinModal();
 }
 
+let pendingAttachment = null;
+
+function handleFileSelect(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  if (file.size > 500000) { alert('Image too large (max 500KB)'); return; }
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    pendingAttachment = ev.target.result;
+    document.getElementById('chat-input').value = file.name;
+  };
+  reader.readAsDataURL(file);
+  e.target.value = '';
+}
+
 function sendMessage() {
   const input = document.getElementById('chat-input');
   const content = input.value.trim();
-  if (!content) return;
-  const message = { id: Date.now().toString(36), senderId: state.memberId, senderName: state.memberName, content, timestamp: Date.now() };
+  if (!content && !pendingAttachment) return;
+  const message = { id: Date.now().toString(36), senderId: state.memberId, senderName: state.memberName, content, attachment: pendingAttachment, timestamp: Date.now() };
   state.messages.push(message);
   state.p2p.send({ type: 'chat:message', data: message });
   renderMessages();
   input.value = '';
+  pendingAttachment = null;
 }
 
 function renderMessages() {
@@ -553,7 +573,8 @@ function renderMessages() {
   state.messages.forEach(msg => {
     const div = document.createElement('div');
     div.className = 'chat-message' + (msg.senderId === state.memberId ? ' own' : '');
-    div.innerHTML = `<div class="chat-sender">${msg.senderId === state.memberId ? 'You' : msg.senderName}</div><div class="chat-content">${msg.content}</div><div class="chat-time">${new Date(msg.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</div>`;
+    const attachmentHtml = msg.attachment ? `<img class="chat-attachment" src="${msg.attachment}" onclick="window.open('${msg.attachment}')">` : '';
+    div.innerHTML = `<div class="chat-sender">${msg.senderId === state.memberId ? 'You' : msg.senderName}</div><div class="chat-content">${msg.content}${attachmentHtml}</div><div class="chat-time">${new Date(msg.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</div>`;
     container.appendChild(div);
   });
   container.scrollTop = container.scrollHeight;
