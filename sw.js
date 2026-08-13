@@ -52,3 +52,20 @@ self.addEventListener('fetch', event => {
       })
   );
 });
+
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clientList => {
+      for (let i = 0; i < clientList.length; i++) {
+        const client = clientList[i];
+        if (client.url.includes('huntr') && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      if (clients.openWindow) {
+        return clients.openWindow('/huntr/');
+      }
+    })
+  );
+});

@@ -10,6 +10,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <script src="https://cdn.onesignal.com/sdks/OneSignalSDK.js" async=""></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     :root {
@@ -29,9 +30,10 @@
     .status-dot.connecting { background: #ffc107; animation: pulse 1s infinite; }
     @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
     .tab-bar { display: flex; background: var(--surface); border-bottom: 1px solid var(--surface-light); flex-shrink: 0; }
-    .tab { flex: 1; padding: 12px; background: none; border: none; color: var(--text-secondary); font-size: 14px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px; border-bottom: 3px solid transparent; }
+    .tab { flex: 1; padding: 12px; background: none; border: none; color: var(--text-secondary); font-size: 14px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px; border-bottom: 3px solid transparent; position: relative; }
     .tab.active { color: var(--primary-light); border-bottom-color: var(--primary-light); }
     .tab-icon { font-size: 24px; }
+    .tab-badge { position: absolute; top: 6px; right: calc(50% - 18px); background: var(--danger); color: white; font-size: 10px; font-weight: bold; min-width: 16px; height: 16px; border-radius: 8px; display: flex; align-items: center; justify-content: center; padding: 0 4px; }
     .content { flex: 1; overflow: hidden; position: relative; }
     #map { width: 100%; height: 100%; }
     .screen { display: none; height: 100%; flex-direction: column; }
@@ -46,7 +48,7 @@
     .form-title { font-size: 24px; text-align: center; }
     .form-group { display: flex; flex-direction: column; gap: 8px; }
     .form-group label { font-size: 14px; color: var(--text-secondary); }
-    .form-input { padding: 14px 16px; border: 2px solid var(--surface-light); border-radius: 10px; background: var(--surface); color: var(--text); font-size: 16px; }
+    .form-input { padding: 14px 16px; border: 2px solid var(--surface-light); border-radius: 10px; background: var(--surface); color: var(--text); font-size: 16px; width: 100%; box-sizing: border-box; }
     .form-input:focus { outline: none; border-color: var(--primary-light); }
     .color-picker { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; }
     .color-option { width: 44px; height: 44px; border-radius: 50%; border: 3px solid transparent; cursor: pointer; }
@@ -60,7 +62,6 @@
     .chat-sender { font-size: 11px; color: var(--primary-light); margin-bottom: 4px; }
     .chat-message.own .chat-sender { color: rgba(255,255,255,0.7); }
     .chat-content { font-size: 15px; line-height: 1.4; }
-    .chat-attachment { max-width: 200px; max-height: 150px; border-radius: 8px; margin-top: 8px; cursor: pointer; }
     .chat-time { font-size: 10px; color: var(--text-secondary); margin-top: 4px; text-align: right; }
     .chat-input-area { display: flex; gap: 8px; padding: 12px; background: var(--surface); border-top: 1px solid var(--surface-light); }
     .chat-input { flex: 1; padding: 12px 16px; border: none; border-radius: 20px; background: var(--background); color: var(--text); font-size: 16px; }
@@ -78,6 +79,9 @@
     .pin-type.selected { border-color: var(--primary-light); background: var(--background); }
     .pin-type-icon { font-size: 28px; display: block; margin-bottom: 4px; }
     .pin-type-label { font-size: 11px; }
+    .pin-image-btn { display: block; width: 100%; padding: 12px; background: var(--surface-light); border: none; border-radius: 10px; color: var(--text); font-size: 14px; cursor: pointer; text-align: center; margin-bottom: 12px; }
+    .pin-image-preview { width: 100%; max-height: 150px; object-fit: cover; border-radius: 10px; margin-bottom: 12px; }
+    .pin-image-preview.hidden { display: none; }
     .modal-textarea { width: 100%; min-height: 100px; padding: 12px; border: none; border-radius: 10px; background: var(--background); color: var(--text); font-size: 16px; resize: none; margin-bottom: 16px; }
     .modal-btn { width: 100%; padding: 16px; background: var(--primary); border: none; border-radius: 10px; color: var(--text); font-size: 16px; font-weight: 600; cursor: pointer; }
     .loading-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.9); display: none; justify-content: center; align-items: center; flex-direction: column; gap: 16px; z-index: 3000; }
@@ -110,7 +114,7 @@
     </div>
     <div class="tab-bar hidden" id="tab-bar">
       <button class="tab active" data-tab="map"><span class="tab-icon">🗺️</span>Map</button>
-      <button class="tab" data-tab="chat"><span class="tab-icon">💬</span>Chat</button>
+      <button class="tab" data-tab="chat"><span class="tab-icon">💬</span>Chat<span class="tab-badge hidden" id="chat-badge">0</span></button>
       <button class="tab" data-tab="archives"><span class="tab-icon">📁</span>Archives</button>
     </div>
     <div class="content" id="main-content">
@@ -131,7 +135,7 @@
       <div class="screen form-screen" id="join-screen">
         <h2 class="form-title">Join a Party</h2>
         <div class="form-group"><label>Your Name</label><input type="text" class="form-input" id="join-name" placeholder="Enter your name" maxlength="20" autocomplete="off"></div>
-        <div class="form-group"><label>Party Code (from creator)</label><input type="text" class="form-input" id="join-code" placeholder="Enter party code" maxlength="20" autocomplete="off" style="text-transform: uppercase;"></div>
+        <div class="form-group"><label>Party Code (from creator)</label><input type="text" class="form-input" id="join-code" placeholder="Enter party code" maxlength="30" autocomplete="off" style="text-transform: uppercase;letter-spacing:1px;"></div>
         <div class="form-group"><label>Pick a Color</label><div class="color-picker" id="join-colors"></div></div>
         <button class="welcome-btn primary" id="btn-do-join">Join Party</button>
         <button class="welcome-btn secondary" id="btn-join-back">Back</button>
@@ -149,8 +153,6 @@
         </div>
         <div class="chat-messages" id="chat-messages"></div>
         <div class="chat-input-area">
-          <button class="chat-btn" id="btn-attach">📎</button>
-          <input type="file" id="chat-file-input" accept="image/*" style="display:none;">
           <input type="text" class="chat-input" id="chat-input" placeholder="Type a message...">
           <button class="chat-btn" id="btn-send">➤</button>
         </div>
@@ -165,6 +167,9 @@
           <button class="pin-type" data-type="landmark"><span class="pin-type-icon">📍</span><span class="pin-type-label">Landmark</span></button>
           <button class="pin-type" data-type="game_sighting"><span class="pin-type-icon">🦌</span><span class="pin-type-label">Game</span></button>
         </div>
+        <div class="pin-image-preview hidden" id="pin-image-preview"></div>
+        <label class="pin-image-btn" for="pin-image-input">📷 Add Photo</label>
+        <input type="file" id="pin-image-input" accept="image/*" style="display:none;">
         <textarea class="modal-textarea" id="pin-text" placeholder="Add notes..."></textarea>
         <button class="modal-btn" id="btn-save-pin">Save Pin</button>
       </div>
@@ -183,6 +188,7 @@ class P2PManager {
     this.connections = new Map();
     this.onMessage = null;
     this.onConnected = null;
+    this.onPeerConnected = null;
     this.onDisconnected = null;
   }
 
@@ -221,7 +227,7 @@ class P2PManager {
         const tryConnect = () => {
           attempts++;
           console.log(`Connection attempt ${attempts}/${maxAttempts} to ${hostId}`);
-          const conn = this.peer.connect(hostId, { reliable: true, serialization: 'json' });
+          const conn = this.peer.connect(hostId, { reliable: true, serialization: 'binary-utf8' });
           conn.on('open', () => {
             console.log('Connected to host');
             this.connections.set(hostId, conn);
@@ -255,6 +261,7 @@ class P2PManager {
       conn.on('open', () => {
         this.connections.set(conn.peer, conn);
         this.setupDataHandler(conn);
+        if (this.onPeerConnected) this.onPeerConnected(conn);
       });
     });
   }
@@ -298,8 +305,8 @@ const state = {
   memberId: null, memberName: null, memberColor: null, inviteCode: null,
   partyActive: false, isCreator: false, members: new Map(), pins: [], messages: [],
   archives: [], currentTab: 'map', selectedPinType: 'observation',
-  pendingPinLocation: null, map: null, memberMarkers: new Map(), pinMarkers: [],
-  p2p: new P2PManager()
+  pendingPinLocation: null, pendingPinImage: null, map: null, memberMarkers: new Map(), pinMarkers: [],
+  p2p: new P2PManager(), unreadMessages: 0, savedSession: null, heading: 0
 };
 
 function init() {
@@ -307,11 +314,95 @@ function init() {
   setupColorPickers();
   setupEventListeners();
   setupP2P();
+  if (state.savedSession) {
+    if (confirm(`Rejoin "${state.savedSession.inviteCode}" as ${state.savedSession.memberName}?`)) {
+      state.inviteCode = state.savedSession.inviteCode;
+      state.memberId = state.savedSession.memberId;
+      state.memberName = state.savedSession.memberName;
+      state.memberColor = state.savedSession.memberColor;
+      state.isCreator = state.savedSession.isCreator;
+      state.partyActive = true;
+      state.members.clear(); state.pins = []; state.messages = [];
+      state.members.set(state.memberId, { id: state.memberId, name: state.memberName, color: state.memberColor, lat: 39.8283, lng: -98.5795 });
+      showLoading('Reconnecting...');
+      if (state.isCreator) {
+        state.p2p.createParty(state.inviteCode).then(() => {
+          hideLoading();
+          activatePartyUI();
+          initMap();
+        }).catch(() => { hideLoading(); clearSession(); alert('Failed to reconnect. Party may have ended.'); });
+      } else {
+        state.p2p.joinParty(state.inviteCode).then(() => {
+          hideLoading();
+          activatePartyUI();
+          initMap();
+          state.p2p.send({ type: 'member:join', data: { id: state.memberId, name: state.memberName, color: state.memberColor } });
+        }).catch(() => { hideLoading(); clearSession(); alert('Failed to reconnect. Party may have ended.'); });
+      }
+    } else {
+      clearSession();
+    }
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && state.partyActive && state.inviteCode) {
+      console.log('App resumed, attempting reconnection...');
+      if (state.isCreator) {
+        state.p2p.destroy();
+        state.p2p = new P2PManager();
+        setupP2P();
+        state.p2p.createParty(state.inviteCode).then(() => {
+          state.members.forEach((m, id) => { if (id !== state.memberId) state.p2p.send({ type: 'member:join', data: m }); });
+        });
+      } else {
+        state.p2p.destroy();
+        state.p2p = new P2PManager();
+        setupP2P();
+        state.p2p.joinParty(state.inviteCode).then(() => {
+          state.p2p.send({ type: 'member:join', data: { id: state.memberId, name: state.memberName, color: state.memberColor } });
+        });
+      }
+    }
+  });
+  initOneSignal();
+}
+
+function initOneSignal() {
+  if (typeof OneSignal !== 'undefined') {
+    OneSignal.push(() => {
+      OneSignal.init({ appId: 'c4e74200-ecc5-4cac-8831-846a5d6caec9' });
+      OneSignal.showSlidedownPrompt();
+    });
+  }
+}
+
+function notifyParty() {
+  if (typeof OneSignal !== 'undefined' && OneSignal.isPushNotificationsEnabled()) {
+    OneSignal.sendSelfNotification('HuntR', 'New activity in your party - tap to open');
+  }
 }
 
 function loadFromStorage() {
   const archives = localStorage.getItem('huntr_archives');
   if (archives) state.archives = JSON.parse(archives);
+  const session = localStorage.getItem('huntr_session');
+  if (session) state.savedSession = JSON.parse(session);
+}
+
+function saveSession() {
+  if (state.partyActive && state.inviteCode) {
+    localStorage.setItem('huntr_session', JSON.stringify({
+      inviteCode: state.inviteCode,
+      memberId: state.memberId,
+      memberName: state.memberName,
+      memberColor: state.memberColor,
+      isCreator: state.isCreator
+    }));
+  }
+}
+
+function clearSession() {
+  localStorage.removeItem('huntr_session');
+  state.savedSession = null;
 }
 
 function saveArchives() { localStorage.setItem('huntr_archives', JSON.stringify(state.archives)); }
@@ -345,6 +436,39 @@ function setupEventListeners() {
   document.getElementById('btn-add-pin').onclick = showAddPinModal;
   document.getElementById('btn-close-pin').onclick = closePinModal;
   document.getElementById('btn-save-pin').onclick = savePin;
+  document.getElementById('pin-image-input').onchange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const maxDim = 1200;
+        let w = img.width, h = img.height;
+        if (w > maxDim || h > maxDim) {
+          if (w > h) { h = (h / w) * maxDim; w = maxDim; } else { w = (w / h) * maxDim; h = maxDim; }
+        }
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        let quality = 0.8;
+        let dataUrl = canvas.toDataURL('image/jpeg', quality);
+        while (dataUrl.length > 550000 && quality > 0.2) {
+          quality -= 0.1;
+          dataUrl = canvas.toDataURL('image/jpeg', quality);
+        }
+        if (dataUrl.length > 550000) { alert('Could not reduce image enough'); return; }
+        state.pendingPinImage = dataUrl;
+        const preview = document.getElementById('pin-image-preview');
+        preview.src = dataUrl;
+        preview.classList.remove('hidden');
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
   document.querySelectorAll('.pin-type').forEach(btn => {
     btn.onclick = () => {
       document.querySelectorAll('.pin-type').forEach(b => b.classList.remove('selected'));
@@ -354,12 +478,15 @@ function setupEventListeners() {
   });
   document.getElementById('btn-send').onclick = sendMessage;
   document.getElementById('chat-input').onkeypress = (e) => { if (e.key === 'Enter') sendMessage(); };
-  document.getElementById('btn-attach').onclick = () => document.getElementById('chat-file-input').click();
-  document.getElementById('chat-file-input').onchange = handleFileSelect;
 }
 
 function setupP2P() {
   state.p2p.onMessage = handleP2PMessage;
+  state.p2p.onPeerConnected = (conn) => {
+    const members = Array.from(state.members.values());
+    const syncData = { type: 'sync', data: { members, pins: state.pins, messages: state.messages } };
+    conn.send(JSON.stringify(syncData));
+  };
   state.p2p.onConnected = () => {
     state.p2p.send({ type: 'member:join', data: { id: state.memberId, name: state.memberName, color: state.memberColor } });
     if (navigator.geolocation) {
@@ -376,23 +503,66 @@ function handleP2PMessage(msg) {
   const data = typeof msg === 'string' ? JSON.parse(msg) : msg;
   console.log('P2P message:', data.type);
   switch (data.type) {
+    case 'sync':
+      data.data.members?.forEach(m => state.members.set(m.id, m));
+      data.data.pins?.forEach(p => { if (!state.pins.find(x => x.id === p.id)) state.pins.push(p); });
+      data.data.messages?.forEach(m => { if (!state.messages.find(x => x.id === m.id)) state.messages.push(m); });
+      updateMapMarkers();
+      updateMemberCount();
+      renderMessages();
+      break;
     case 'member:join':
-      state.members.set(data.data.id, data.data);
+      if (data.data.id !== state.memberId) {
+        state.members.set(data.data.id, data.data);
+        if (state.isCreator) state.p2p.send({ type: 'member:join', data: data.data });
+        updateMapMarkers();
+        updateMemberCount();
+      }
+      break;
+    case 'member:leave':
+      if (data.data.id === state.memberId) return;
+      state.members.delete(data.data.id);
+      if (data.data.wasCreator && state.members.size > 0) {
+        const newCreator = state.members.values().next().value;
+        if (newCreator) {
+          state.isCreator = true;
+          state.memberId = newCreator.id;
+          state.memberName = newCreator.name;
+          state.memberColor = newCreator.color;
+        }
+      }
+      if (state.isCreator) state.p2p.send({ type: 'member:leave', data: data.data });
       updateMapMarkers();
       updateMemberCount();
       break;
     case 'location:update':
       const member = state.members.get(data.data.id);
       if (member) { member.lat = data.data.lat; member.lng = data.data.lng; }
-      if (data.data.id !== state.memberId) updateMapMarkers();
+      updateMapMarkers();
+      if (state.isCreator && data.data.id !== state.memberId) state.p2p.send({ type: 'location:update', data: data.data });
       break;
     case 'pin:create':
-      state.pins.push(data.data);
-      updateMapMarkers();
+      if (!state.pins.find(p => p.id === data.data.id)) {
+        state.pins.push(data.data);
+        updateMapMarkers();
+        if (state.currentTab === 'map' && data.data.creatorId !== state.memberId) notifyParty();
+        if (state.isCreator) state.p2p.send({ type: 'pin:create', data: data.data });
+      }
       break;
     case 'chat:message':
-      state.messages.push(data.data);
-      renderMessages();
+      if (!state.messages.find(m => m.id === data.data.id)) {
+        state.messages.push(data.data);
+        if (state.currentTab === 'chat') {
+          renderMessages();
+        } else {
+          state.unreadMessages++;
+          updateChatBadge();
+          if (data.data.senderId !== state.memberId) notifyParty();
+        }
+        if (state.isCreator) {
+          state.p2p.send({ type: 'chat:message', data: data.data });
+        }
+      }
       break;
   }
 }
@@ -403,12 +573,22 @@ function showScreen(name) {
   if (name === 'map' && state.map) setTimeout(() => state.map.invalidateSize(), 100);
 }
 
+function updateChatBadge() {
+  const badge = document.getElementById('chat-badge');
+  if (state.unreadMessages > 0) {
+    badge.textContent = state.unreadMessages > 99 ? '99+' : state.unreadMessages;
+    badge.classList.remove('hidden');
+  } else {
+    badge.classList.add('hidden');
+  }
+}
+
 function switchTab(tab) {
   state.currentTab = tab;
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   document.querySelector(`.tab[data-tab="${tab}"]`).classList.add('active');
   if (tab === 'map') { showScreen('map'); if (state.map) setTimeout(() => state.map.invalidateSize(), 100); }
-  else if (tab === 'chat') showScreen('chat');
+  else if (tab === 'chat') { state.unreadMessages = 0; updateChatBadge(); renderMessages(); showScreen('chat'); }
   else if (tab === 'archives') { showScreen('archives'); renderArchives(); }
 }
 
@@ -432,6 +612,7 @@ async function createParty() {
     hideLoading();
     activatePartyUI();
     initMap();
+    saveSession();
   } catch (err) { hideLoading(); alert('Failed to create party: ' + err.message); }
 }
 
@@ -454,6 +635,7 @@ async function joinParty() {
     activatePartyUI();
     initMap();
     state.p2p.send({ type: 'member:join', data: { id: state.memberId, name: state.memberName, color: state.memberColor } });
+    saveSession();
   } catch (err) { hideLoading(); alert('Failed to join party: ' + err.message); }
 }
 
@@ -469,18 +651,33 @@ function activatePartyUI() {
   };
   updateMemberCount();
   switchTab('map');
+  if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+    DeviceOrientationEvent.requestPermission().then(permission => {
+      if (permission === 'granted') setupDeviceOrientation();
+    }).catch(console.error);
+  } else {
+    setupDeviceOrientation();
+  }
+}
+
+function setupDeviceOrientation() {
+  window.addEventListener('deviceorientation', (e) => {
+    if (e.alpha !== null) {
+      state.heading = e.alpha;
+      updateMapMarkers();
+    }
+  });
 }
 
 function endHunt() {
-  if (!confirm('End this hunt? All data will be archived.')) return;
-  const archive = { id: Date.now().toString(36), name: state.inviteCode, date: new Date().toLocaleDateString(), members: Array.from(state.members.values()), pins: state.pins, messages: state.messages };
-  state.archives.unshift(archive);
-  saveArchives();
+  if (!confirm('Leave this hunt?')) return;
+  state.p2p.send({ type: 'member:leave', data: { id: state.memberId, wasCreator: state.isCreator } });
   state.p2p.destroy();
   state.partyActive = false;
   state.members.clear(); state.pins = []; state.messages = [];
   state.p2p = new P2PManager();
   setupP2P();
+  clearSession();
   document.getElementById('app-header').classList.add('hidden');
   document.getElementById('tab-bar').classList.add('hidden');
   document.getElementById('chat-party-info').classList.add('hidden');
@@ -490,8 +687,19 @@ function endHunt() {
 function initMap() {
   if (state.map) state.map.remove();
   state.map = L.map('map').setView([39.8283, -98.5795], 5);
-  L.tileLayer('https://tile.opentopomap.org/{z}/{x}/{y}.png', { maxZoom: 17, attribution: '© OpenTopoMap' }).addTo(state.map);
-  state.map.on('contextmenu', (e) => { if (state.partyActive) { state.pendingPinLocation = e.latlng; showAddPinModal(); } });
+  L.tileLayer('https://tile.opentopomap.org/{z}/{x}/{y}.png', { maxZoom: 17, attribution: '© OpenStreetMap contributors, SRTM | Map style: © OpenTopoMap' }).addTo(state.map);
+  let tempPinMarker = null;
+  state.map.on('contextmenu', (e) => { 
+    if (state.partyActive) { 
+      state.pendingPinLocation = e.latlng; 
+      if (tempPinMarker) state.map.removeLayer(tempPinMarker);
+      tempPinMarker = L.circleMarker(e.latlng, { radius: 10, color: 'white', fillColor: '#FF6B6B', fillOpacity: 1, weight: 3 }).addTo(state.map);
+      showAddPinModal(); 
+    } 
+  });
+  state.map.on('click', () => { 
+    if (tempPinMarker) { state.map.removeLayer(tempPinMarker); tempPinMarker = null; }
+  });
   updateMapMarkers();
   centerOnLocation();
 }
@@ -503,16 +711,25 @@ function updateMapMarkers() {
   state.memberMarkers.forEach(m => state.map.removeLayer(m));
   state.memberMarkers.clear();
   state.members.forEach((member, id) => {
-    const icon = L.divIcon({ className: 'member-marker', html: `<div style="width:36px;height:36px;border-radius:50%;background:${member.color};display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:14px;color:white;border:3px solid white;">${member.name.substring(0,2).toUpperCase()}</div><div style="background:white;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;margin-top:4px;white-space:nowrap;">${member.name}</div>`, iconSize: [60, 70], iconAnchor: [30, 70] });
+    let markerHtml = `<div style="width:36px;height:36px;border-radius:50%;background:${member.color};display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:14px;color:white;border:3px solid white;"></div><div style="background:white;color:#333;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;margin-top:4px;white-space:nowrap;">${member.name||'Unknown'}</div>`;
+    if (id === state.memberId && state.heading) {
+      const rotation = state.heading - 90;
+      markerHtml = `<div style="position:relative;width:36px;height:36px;border-radius:50%;background:${member.color};border:3px solid white;display:flex;align-items:center;justify-content:center;"><div style="width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:14px solid white;transform:rotate(${rotation}deg);"></div></div><div style="background:white;color:#333;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;margin-top:4px;white-space:nowrap;">${member.name||'Unknown'}</div>`;
+    }
+    const icon = L.divIcon({ className: 'member-marker', html: markerHtml, iconSize: [60, 75], iconAnchor: [30, 65] });
     const marker = L.marker([member.lat || 39.8283, member.lng || -98.5795], { icon }).addTo(state.map);
     state.memberMarkers.set(id, marker);
   });
   state.pinMarkers.forEach(m => state.map.removeLayer(m));
   state.pinMarkers = [];
   state.pins.forEach(pin => {
-    const icon = L.divIcon({ className: 'pin-marker', html: PIN_TYPES[pin.type]?.icon || '📍', iconSize: [32, 32], iconAnchor: [16, 32] });
+    const colors = { observation: '#FF6B6B', landmark: '#4ECDC4', game_sighting: '#96CEB4' };
+    const color = colors[pin.type] || '#FF6B6B';
+    const html = `<div style="width:24px;height:24px;background:${color};border:3px solid white;border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 2px 6px rgba(0,0,0,0.4);"></div>`;
+    const icon = L.divIcon({ className: 'pin-marker', html, iconSize: [24, 32], iconAnchor: [12, 32] });
     const marker = L.marker([pin.latitude, pin.longitude], { icon }).addTo(state.map);
-    marker.bindPopup(`<b>${PIN_TYPES[pin.type]?.label}</b><br>${pin.text || ''}<br><small>${pin.creatorName}</small>`);
+    const imageHtml = pin.image ? `<img src="${pin.image}" style="max-width:150px;max-height:100px;border-radius:6px;margin:6px 0;"><br>` : '';
+    marker.bindPopup(`<b>${PIN_TYPES[pin.type]?.label}</b><br>${imageHtml}${pin.text || ''}<br><small>${pin.creatorName}</small>`);
     state.pinMarkers.push(marker);
   });
 }
@@ -529,42 +746,28 @@ function centerOnLocation() {
 }
 
 function showAddPinModal() { document.getElementById('pin-modal').classList.add('active'); document.getElementById('pin-text').value = ''; }
-function closePinModal() { document.getElementById('pin-modal').classList.remove('active'); state.pendingPinLocation = null; }
+function closePinModal() { document.getElementById('pin-modal').classList.remove('active'); state.pendingPinLocation = null; state.pendingPinImage = null; document.getElementById('pin-image-preview').classList.add('hidden'); document.getElementById('pin-image-preview').src = ''; }
 
 function savePin() {
   const text = document.getElementById('pin-text').value.trim();
-  const pin = { id: Date.now().toString(36), type: state.selectedPinType, latitude: state.pendingPinLocation?.lat || 39.8283, longitude: state.pendingPinLocation?.lng || -98.5795, text, creatorId: state.memberId, creatorName: state.memberName, timestamp: Date.now() };
+  const lat = state.pendingPinLocation?.lat ?? 39.8283;
+  const lng = state.pendingPinLocation?.lng ?? -98.5795;
+  const pin = { id: Date.now().toString(36), type: state.selectedPinType, latitude: lat, longitude: lng, text, image: state.pendingPinImage, creatorId: state.memberId, creatorName: state.memberName, timestamp: Date.now() };
   state.pins.push(pin);
   state.p2p.send({ type: 'pin:create', data: pin });
   updateMapMarkers();
   closePinModal();
 }
 
-let pendingAttachment = null;
-
-function handleFileSelect(e) {
-  const file = e.target.files[0];
-  if (!file) return;
-  if (file.size > 500000) { alert('Image too large (max 500KB)'); return; }
-  const reader = new FileReader();
-  reader.onload = (ev) => {
-    pendingAttachment = ev.target.result;
-    document.getElementById('chat-input').value = file.name;
-  };
-  reader.readAsDataURL(file);
-  e.target.value = '';
-}
-
 function sendMessage() {
   const input = document.getElementById('chat-input');
   const content = input.value.trim();
-  if (!content && !pendingAttachment) return;
-  const message = { id: Date.now().toString(36), senderId: state.memberId, senderName: state.memberName, content, attachment: pendingAttachment, timestamp: Date.now() };
+  if (!content) return;
+  const message = { id: Date.now().toString(36), senderId: state.memberId, senderName: state.memberName, content, timestamp: Date.now() };
   state.messages.push(message);
   state.p2p.send({ type: 'chat:message', data: message });
   renderMessages();
   input.value = '';
-  pendingAttachment = null;
 }
 
 function renderMessages() {
@@ -573,8 +776,7 @@ function renderMessages() {
   state.messages.forEach(msg => {
     const div = document.createElement('div');
     div.className = 'chat-message' + (msg.senderId === state.memberId ? ' own' : '');
-    const attachmentHtml = msg.attachment ? `<img class="chat-attachment" src="${msg.attachment}" onclick="window.open('${msg.attachment}')">` : '';
-    div.innerHTML = `<div class="chat-sender">${msg.senderId === state.memberId ? 'You' : msg.senderName}</div><div class="chat-content">${msg.content}${attachmentHtml}</div><div class="chat-time">${new Date(msg.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</div>`;
+    div.innerHTML = `<div class="chat-sender">${msg.senderId === state.memberId ? 'You' : msg.senderName}</div><div class="chat-content">${msg.content}</div><div class="chat-time">${new Date(msg.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</div>`;
     container.appendChild(div);
   });
   container.scrollTop = container.scrollHeight;
