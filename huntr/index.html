@@ -10,7 +10,13 @@
   <link rel="manifest" href="manifest.json">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-  <script src="https://cdn.onesignal.com/sdks/OneSignalSDK.js" async=""></script>
+  <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+  <script>
+    window.OneSignalDeferred = window.OneSignalDeferred || [];
+    OneSignalDeferred.push(async function(OneSignal) {
+      await OneSignal.init({ appId: "c4e74200-ecc5-4cac-8831-846a5d6caec9" });
+    });
+  </script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     :root {
@@ -368,16 +374,15 @@ function init() {
 
 function initOneSignal() {
   if (typeof OneSignal !== 'undefined') {
-    OneSignal.push(() => {
-      OneSignal.init({ appId: 'c4e74200-ecc5-4cac-8831-846a5d6caec9' });
-      OneSignal.showSlidedownPrompt();
+    OneSignalDeferred.push(async function(OneSignal) {
+      await OneSignal.init({ appId: 'c4e74200-ecc5-4cac-8831-846a5d6caec9' });
     });
   }
 }
 
 function notifyParty() {
-  if (typeof OneSignal !== 'undefined' && OneSignal.isPushNotificationsEnabled()) {
-    OneSignal.sendSelfNotification('HuntR', 'New activity in your party - tap to open');
+  if (typeof OneSignal !== 'undefined' && OneSignal.isPushNotificationsSupported()) {
+    OneSignal.Notifications.requestPermission();
   }
 }
 
