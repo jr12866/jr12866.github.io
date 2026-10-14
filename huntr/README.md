@@ -16,6 +16,8 @@ A mobile-first web app for hunting parties to share real-time positions, chat, a
 
 Open `index.html` directly in a browser, or serve locally:
 
+> Pins and chat persist across reloads via `localStorage`. Tapping an archive card on the Archives tab opens a viewer that lists every pin from that hunt (type, creator, time, notes, photo, lat/lng) plus the chat history. End Hunt writes the archive automatically.
+
 ```bash
 npx serve .
 ```
