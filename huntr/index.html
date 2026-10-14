@@ -95,14 +95,34 @@
     .spinner { width: 48px; height: 48px; border: 4px solid var(--surface-light); border-top-color: var(--primary-light); border-radius: 50%; animation: spin 1s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
     .archives-list { flex: 1; overflow-y: auto; padding: 12px; }
-    .archive-card { background: var(--surface); border-radius: 12px; padding: 16px; margin-bottom: 12px; }
+    .archive-card { background: var(--surface); border-radius: 12px; padding: 16px; margin-bottom: 12px; cursor: pointer; }
+    .archive-card:hover { background: var(--surface-light); }
     .archive-name { font-size: 16px; font-weight: 600; margin-bottom: 8px; }
     .archive-meta { font-size: 12px; color: var(--text-secondary); margin-bottom: 12px; }
     .archive-stats { display: flex; justify-content: space-around; padding: 12px 0; border-top: 1px solid var(--surface-light); border-bottom: 1px solid var(--surface-light); margin-bottom: 12px; }
     .archive-stat { text-align: center; }
     .archive-stat-value { font-size: 20px; font-weight: 600; }
     .archive-stat-label { font-size: 11px; color: var(--text-secondary); }
-    .archive-share-btn { width: 100%; padding: 12px; background: var(--surface-light); border: none; border-radius: 8px; color: var(--primary-light); font-size: 14px; font-weight: 600; cursor: pointer; }
+    .archive-actions { display: flex; gap: 8px; }
+    .archive-share-btn { flex: 1; padding: 12px; background: var(--surface-light); border: none; border-radius: 8px; color: var(--primary-light); font-size: 14px; font-weight: 600; cursor: pointer; }
+    .archive-share-btn.danger { color: var(--danger); }
+    .archive-viewer-content { max-height: 90%; padding: 20px; }
+    .archive-meta-line { font-size: 13px; color: var(--text-secondary); margin: 12px 0; line-height: 1.6; }
+    .archive-meta-line strong { color: var(--text); }
+    .archive-section-title { font-size: 15px; margin: 18px 0 10px; color: var(--primary-light); }
+    .archive-pins { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
+    .archive-pin { display: flex; gap: 12px; padding: 12px; background: var(--background); border-radius: 10px; }
+    .archive-pin-icon { font-size: 28px; line-height: 1; flex-shrink: 0; }
+    .archive-pin-body { flex: 1; min-width: 0; }
+    .archive-pin-title { font-weight: 600; margin-bottom: 6px; }
+    .archive-pin-meta { font-weight: 400; color: var(--text-secondary); font-size: 12px; margin-left: 6px; }
+    .archive-pin-text { font-size: 14px; line-height: 1.4; white-space: pre-wrap; word-break: break-word; }
+    .archive-pin-image { display: block; max-width: 100%; max-height: 220px; border-radius: 8px; margin-top: 8px; object-fit: cover; }
+    .archive-pin-coords { font-size: 11px; color: var(--text-secondary); margin-top: 6px; }
+    .archive-chip { display: inline-block; padding: 2px 8px; margin: 2px 4px 2px 0; border-radius: 10px; font-size: 11px; color: #1a1a1a; font-weight: 600; }
+    .archive-section { background: var(--background); border-radius: 10px; padding: 12px; margin-bottom: 12px; }
+    .archive-section summary { cursor: pointer; font-weight: 600; color: var(--primary-light); padding: 4px 0; }
+    .archive-chat { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
     .empty-state { text-align: center; padding: 48px 24px; color: var(--text-secondary); }
     .empty-icon { font-size: 64px; margin-bottom: 16px; }
     .hidden { display: none !important; }
@@ -181,12 +201,21 @@
       </div>
     </div>
     <div class="loading-overlay" id="loading-overlay"><div class="spinner"></div><p id="loading-text">Connecting...</p></div>
+    <div class="modal" id="archive-viewer">
+      <div class="modal-content archive-viewer-content" id="archive-viewer-content"></div>
+    </div>
   </div>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
 const COLORS = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#98D8C8', '#F8DC6F'];
 const PIN_TYPES = { observation: { icon: '👁', label: 'Observation' }, landmark: { icon: '📍', label: 'Landmark' }, game_sighting: { icon: '🦌', label: 'Game' } };
 const INVITE_SUFFIXES = ['ALPHA', 'BRAVO', 'CHARLIE', 'DELTA', 'ECHO'];
+
+// Stable unique ID combining time + entropy so two members can drop a
+// pin/message in the same millisecond without clobbering each other.
+function generateId() {
+  return Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 9) + Math.random().toString(36).slice(2, 9);
+}
 
 class P2PManager {
   constructor() {
@@ -312,7 +341,8 @@ const state = {
   partyActive: false, isCreator: false, members: new Map(), pins: [], messages: [],
   archives: [], currentTab: 'map', selectedPinType: 'observation',
   pendingPinLocation: null, pendingPinImage: null, map: null, memberMarkers: new Map(), pinMarkers: [],
-  p2p: new P2PManager(), unreadMessages: 0, savedSession: null, heading: 0
+  p2p: new P2PManager(), unreadMessages: 0, savedSession: null, heading: 0,
+  huntStartedAt: null, huntName: null
 };
 
 function init() {
@@ -328,22 +358,39 @@ function init() {
       state.memberColor = state.savedSession.memberColor;
       state.isCreator = state.savedSession.isCreator;
       state.partyActive = true;
-      state.members.clear(); state.pins = []; state.messages = [];
-      state.members.set(state.memberId, { id: state.memberId, name: state.memberName, color: state.memberColor, lat: 39.8283, lng: -98.5795 });
+      state.huntStartedAt = state.savedSession.huntStartedAt || state.huntStartedAt || Date.now();
+      state.huntName = state.savedSession.huntName || state.huntName || state.inviteCode;
+      // loadFromStorage() has already populated state.pins/messages/members
+      // for this invite code. Do NOT wipe them here or we'd lose every pin
+      // the party dropped before the page reload.
+      if (!state.members.has(state.memberId)) {
+        state.members.set(state.memberId, { id: state.memberId, name: state.memberName, color: state.memberColor, lat: 39.8283, lng: -98.5795 });
+      }
       showLoading('Reconnecting...');
       if (state.isCreator) {
         state.p2p.createParty(state.inviteCode).then(() => {
           hideLoading();
           activatePartyUI();
           initMap();
-        }).catch(() => { hideLoading(); clearSession(); alert('Failed to reconnect. Party may have ended.'); });
+          renderMessages();
+          // Re-broadcast our existing pins so late-joining peers and
+          // any peer that missed them while we were offline converge.
+          state.pins.forEach(p => state.p2p.send({ type: 'pin:create', data: p }));
+          persistActiveHunt();
+        }).catch(() => { hideLoading(); clearSession(); clearActiveHunt(); alert('Failed to reconnect. Party may have ended.'); });
       } else {
         state.p2p.joinParty(state.inviteCode).then(() => {
           hideLoading();
           activatePartyUI();
           initMap();
-          state.p2p.send({ type: 'member:join', data: { id: state.memberId, name: state.memberName, color: state.memberColor } });
-        }).catch(() => { hideLoading(); clearSession(); alert('Failed to reconnect. Party may have ended.'); });
+          renderMessages();
+          // Tell the host about us (with our restored pin count) and
+          // then re-broadcast our own pins so the host (and via the
+          // host, every other member) gains them.
+          state.p2p.send({ type: 'member:join', data: { id: state.memberId, name: state.memberName, color: state.memberColor, pinCount: state.pins.length } });
+          state.pins.forEach(p => state.p2p.send({ type: 'pin:create', data: p }));
+          persistActiveHunt();
+        }).catch(() => { hideLoading(); clearSession(); clearActiveHunt(); alert('Failed to reconnect. Party may have ended.'); });
       }
     } else {
       clearSession();
@@ -358,13 +405,19 @@ function init() {
         setupP2P();
         state.p2p.createParty(state.inviteCode).then(() => {
           state.members.forEach((m, id) => { if (id !== state.memberId) state.p2p.send({ type: 'member:join', data: m }); });
+          // Re-broadcast our existing pins so any peer that was offline
+          // while we were backgrounded catches up.
+          state.pins.forEach(p => state.p2p.send({ type: 'pin:create', data: p }));
+          persistActiveHunt();
         });
       } else {
         state.p2p.destroy();
         state.p2p = new P2PManager();
         setupP2P();
         state.p2p.joinParty(state.inviteCode).then(() => {
-          state.p2p.send({ type: 'member:join', data: { id: state.memberId, name: state.memberName, color: state.memberColor } });
+          state.p2p.send({ type: 'member:join', data: { id: state.memberId, name: state.memberName, color: state.memberColor, pinCount: state.pins.length } });
+          state.pins.forEach(p => state.p2p.send({ type: 'pin:create', data: p }));
+          persistActiveHunt();
         });
       }
     }
@@ -391,6 +444,19 @@ function loadFromStorage() {
   if (archives) state.archives = JSON.parse(archives);
   const session = localStorage.getItem('huntr_session');
   if (session) state.savedSession = JSON.parse(session);
+  // Restore any pins/messages/members for the active hunt so they survive
+  // page reloads and tab switches.
+  const sessionInvite = state.savedSession?.inviteCode;
+  if (sessionInvite) {
+    const st = readActiveHuntState(sessionInvite);
+    if (st) {
+      state.pins = Array.isArray(st.pins) ? st.pins : [];
+      state.messages = Array.isArray(st.messages) ? st.messages : [];
+      state.members = new Map(Array.isArray(st.members) ? st.members.map(m => [m.id, m]) : []);
+      state.huntStartedAt = st.huntStartedAt || null;
+      state.huntName = st.huntName || null;
+    }
+  }
 }
 
 function saveSession() {
@@ -400,7 +466,9 @@ function saveSession() {
       memberId: state.memberId,
       memberName: state.memberName,
       memberColor: state.memberColor,
-      isCreator: state.isCreator
+      isCreator: state.isCreator,
+      huntStartedAt: state.huntStartedAt,
+      huntName: state.huntName
     }));
   }
 }
@@ -411,6 +479,46 @@ function clearSession() {
 }
 
 function saveArchives() { localStorage.setItem('huntr_archives', JSON.stringify(state.archives)); }
+
+// --- Active hunt persistence --------------------------------------------
+// Pins, messages, and member snapshots are persisted so a page reload or
+// temporary disconnect does not lose every pin that has been dropped on
+// the map. Data is keyed by the party invite code so multiple hunts can
+// live in localStorage at once.
+function activeHuntKey(inviteCode) { return 'huntr_active_' + inviteCode; }
+
+function readActiveHuntState(inviteCode) {
+  try {
+    const raw = localStorage.getItem(activeHuntKey(inviteCode));
+    return raw ? JSON.parse(raw) : null;
+  } catch (err) {
+    console.error('Failed to read active hunt state:', err);
+    return null;
+  }
+}
+
+function persistActiveHunt() {
+  if (!state.inviteCode || !state.partyActive) return;
+  const payload = {
+    huntStartedAt: state.huntStartedAt,
+    huntName: state.huntName,
+    pins: state.pins,
+    messages: state.messages,
+    members: Array.from(state.members.values())
+  };
+  try {
+    localStorage.setItem(activeHuntKey(state.inviteCode), JSON.stringify(payload));
+  } catch (err) {
+    // localStorage quota errors are non-fatal; log and continue so
+    // the live P2P session is not disrupted.
+    console.error('Failed to persist active hunt:', err);
+  }
+}
+
+function clearActiveHunt() {
+  if (!state.inviteCode) return;
+  localStorage.removeItem(activeHuntKey(state.inviteCode));
+}
 
 function setupColorPickers() {
   ['create', 'join'].forEach(prefix => {
@@ -515,6 +623,17 @@ function handleP2PMessage(msg) {
       updateMapMarkers();
       updateMemberCount();
       renderMessages();
+      persistActiveHunt();
+      break;
+    case 'sync:request':
+      // A late-joining peer asks every connected member for any pins
+      // that the host may not have. Each peer responds with its full
+      // pin set so the host can converge. (Rejoin paths also broadcast
+      // pins directly via pin:create, so this is just an extra safety
+      // net for plain crashes.)
+      if (state.pins.length > 0) {
+        state.pins.forEach(p => state.p2p.send({ type: 'pin:create', data: p }));
+      }
       break;
     case 'member:join':
       if (data.data.id !== state.memberId) {
@@ -522,6 +641,12 @@ function handleP2PMessage(msg) {
         if (state.isCreator) state.p2p.send({ type: 'member:join', data: data.data });
         updateMapMarkers();
         updateMemberCount();
+        persistActiveHunt();
+        // If a returning peer arrives reporting > 0 pins, ask them to
+        // re-broadcast so we converge.
+        if (state.isCreator && data.data.pinCount && data.data.pinCount > 0) {
+          state.p2p.send({ type: 'sync:request', data: {} });
+        }
       }
       break;
     case 'member:leave':
@@ -539,6 +664,7 @@ function handleP2PMessage(msg) {
       if (state.isCreator) state.p2p.send({ type: 'member:leave', data: data.data });
       updateMapMarkers();
       updateMemberCount();
+      persistActiveHunt();
       break;
     case 'location:update':
       const member = state.members.get(data.data.id);
@@ -551,7 +677,11 @@ function handleP2PMessage(msg) {
         state.pins.push(data.data);
         updateMapMarkers();
         if (state.currentTab === 'map' && data.data.creatorId !== state.memberId) notifyParty();
+        // The creator forwards to every member (members are in a star
+        // topology with the host as the hub). If this peer's host is
+        // offline, this pin only reaches the peers still connected.
         if (state.isCreator) state.p2p.send({ type: 'pin:create', data: data.data });
+        persistActiveHunt();
       }
       break;
     case 'chat:message':
@@ -567,6 +697,7 @@ function handleP2PMessage(msg) {
         if (state.isCreator) {
           state.p2p.send({ type: 'chat:message', data: data.data });
         }
+        persistActiveHunt();
       }
       break;
   }
@@ -609,7 +740,20 @@ async function createParty() {
   state.memberId = 'host-' + Date.now().toString(36);
   state.memberName = name; state.memberColor = color;
   state.isCreator = true; state.partyActive = true;
-  state.members.clear(); state.pins = []; state.messages = [];
+  // Preserve any pins/messages already persisted for this invite code from
+  // a prior creator session that crashed mid-hunt. Otherwise start fresh.
+  const st = readActiveHuntState(state.inviteCode);
+  if (st) {
+    state.pins = Array.isArray(st.pins) ? st.pins : [];
+    state.messages = Array.isArray(st.messages) ? st.messages : [];
+    state.members = new Map(Array.isArray(st.members) ? st.members.map(m => [m.id, m]) : []);
+    state.huntStartedAt = st.huntStartedAt || Date.now();
+    state.huntName = st.huntName || state.inviteCode;
+  } else {
+    state.pins = []; state.messages = []; state.members = new Map();
+    state.huntStartedAt = Date.now();
+    state.huntName = state.inviteCode;
+  }
   state.members.set(state.memberId, { id: state.memberId, name: name, color: color, lat: 39.8283, lng: -98.5795 });
   showLoading('Creating party...');
   try {
@@ -617,7 +761,12 @@ async function createParty() {
     hideLoading();
     activatePartyUI();
     initMap();
+    renderMessages();
     saveSession();
+    persistActiveHunt();
+    // Re-announce existing pins so any peer that was already connected
+    // also gets them.
+    state.pins.forEach(p => state.p2p.send({ type: 'pin:create', data: p }));
   } catch (err) { hideLoading(); alert('Failed to create party: ' + err.message); }
 }
 
@@ -631,7 +780,18 @@ async function joinParty() {
   state.memberId = 'hunter-' + Date.now().toString(36);
   state.memberName = name; state.memberColor = color;
   state.isCreator = false; state.partyActive = true;
-  state.members.clear(); state.pins = []; state.messages = [];
+  const st = readActiveHuntState(state.inviteCode);
+  if (st) {
+    state.pins = Array.isArray(st.pins) ? st.pins : [];
+    state.messages = Array.isArray(st.messages) ? st.messages : [];
+    state.members = new Map(Array.isArray(st.members) ? st.members.map(m => [m.id, m]) : []);
+    state.huntStartedAt = st.huntStartedAt || Date.now();
+    state.huntName = st.huntName || state.inviteCode;
+  } else {
+    state.pins = []; state.messages = []; state.members = new Map();
+    state.huntStartedAt = Date.now();
+    state.huntName = state.inviteCode;
+  }
   state.members.set(state.memberId, { id: state.memberId, name: name, color: color, lat: 39.8283, lng: -98.5795 });
   showLoading('Joining party...');
   try {
@@ -639,8 +799,10 @@ async function joinParty() {
     hideLoading();
     activatePartyUI();
     initMap();
-    state.p2p.send({ type: 'member:join', data: { id: state.memberId, name: state.memberName, color: state.memberColor } });
+    renderMessages();
+    state.p2p.send({ type: 'member:join', data: { id: state.memberId, name: state.memberName, color: state.memberColor, pinCount: state.pins.length } });
     saveSession();
+    persistActiveHunt();
   } catch (err) { hideLoading(); alert('Failed to join party: ' + err.message); }
 }
 
@@ -675,7 +837,31 @@ function setupDeviceOrientation() {
 }
 
 function endHunt() {
-  if (!confirm('Leave this hunt?')) return;
+  if (!confirm('End this hunt and archive it?')) return;
+  // Build the archive BEFORE clearing in-memory state so every pin and
+  // message is captured. The previous implementation wiped state.pins
+  // and friends immediately, which is why the archives screen always
+  // showed "No Archives Yet".
+  const endTime = Date.now();
+  const startTime = state.huntStartedAt || (endTime - 3600000);
+  const archive = {
+    id: generateId(),
+    name: state.huntName || state.inviteCode,
+    inviteCode: state.inviteCode,
+    date: new Date(endTime).toISOString().split('T')[0],
+    startTime,
+    endTime,
+    durationMs: endTime - startTime,
+    members: Array.from(state.members.values()).map(m => ({
+      id: m.id, name: m.name, color: m.color, lat: m.lat, lng: m.lng
+    })),
+    pins: state.pins.slice(),
+    messages: state.messages.slice(),
+    archivedAt: endTime
+  };
+  state.archives.unshift(archive);
+  saveArchives();
+
   state.p2p.send({ type: 'member:leave', data: { id: state.memberId, wasCreator: state.isCreator } });
   state.p2p.destroy();
   state.partyActive = false;
@@ -683,6 +869,9 @@ function endHunt() {
   state.p2p = new P2PManager();
   setupP2P();
   clearSession();
+  clearActiveHunt();
+  state.huntStartedAt = null;
+  state.huntName = null;
   document.getElementById('app-header').classList.add('hidden');
   document.getElementById('tab-bar').classList.add('hidden');
   document.getElementById('chat-party-info').classList.add('hidden');
@@ -757,10 +946,23 @@ function savePin() {
   const text = document.getElementById('pin-text').value.trim();
   const lat = state.pendingPinLocation?.lat ?? 39.8283;
   const lng = state.pendingPinLocation?.lng ?? -98.5795;
-  const pin = { id: Date.now().toString(36), type: state.selectedPinType, latitude: lat, longitude: lng, text, image: state.pendingPinImage, creatorId: state.memberId, creatorName: state.memberName, timestamp: Date.now() };
+  // Use a unique ID so two members who create a pin at the same
+  // millisecond don't collide and overwrite each other.
+  const pin = {
+    id: generateId(),
+    type: state.selectedPinType,
+    latitude: lat,
+    longitude: lng,
+    text,
+    image: state.pendingPinImage,
+    creatorId: state.memberId,
+    creatorName: state.memberName,
+    timestamp: Date.now()
+  };
   state.pins.push(pin);
   state.p2p.send({ type: 'pin:create', data: pin });
   updateMapMarkers();
+  persistActiveHunt();
   closePinModal();
 }
 
@@ -768,10 +970,17 @@ function sendMessage() {
   const input = document.getElementById('chat-input');
   const content = input.value.trim();
   if (!content) return;
-  const message = { id: Date.now().toString(36), senderId: state.memberId, senderName: state.memberName, content, timestamp: Date.now() };
+  const message = {
+    id: generateId(),
+    senderId: state.memberId,
+    senderName: state.memberName,
+    content,
+    timestamp: Date.now()
+  };
   state.messages.push(message);
   state.p2p.send({ type: 'chat:message', data: message });
   renderMessages();
+  persistActiveHunt();
   input.value = '';
 }
 
@@ -792,7 +1001,26 @@ function updateMemberCount() { document.getElementById('chat-member-count').text
 function renderArchives() {
   const container = document.getElementById('archives-list');
   if (state.archives.length === 0) { container.innerHTML = '<div class="empty-state"><div class="empty-icon">📁</div><p>No Archives Yet</p><p style="font-size:14px;margin-top:8px;">When you end a hunt, it will be saved here</p></div>'; return; }
-  container.innerHTML = state.archives.map(archive => `<div class="archive-card"><div class="archive-name">${archive.name}</div><div class="archive-meta">${archive.date}</div><div class="archive-stats"><div class="archive-stat"><div class="archive-stat-value">${archive.members.length}</div><div class="archive-stat-label">Members</div></div><div class="archive-stat"><div class="archive-stat-value">${archive.pins.length}</div><div class="archive-stat-label">Pins</div></div><div class="archive-stat"><div class="archive-stat-value">${archive.messages.length}</div><div class="archive-stat-label">Messages</div></div></div><button class="archive-share-btn" onclick="shareArchive('${archive.id}')">Share Archive</button></div>`).join('');
+  container.innerHTML = state.archives.map(archive => {
+    const start = archive.startTime ? new Date(archive.startTime) : null;
+    const end = archive.endTime ? new Date(archive.endTime) : null;
+    const dateLabel = archive.date || (start ? start.toISOString().split('T')[0] : '');
+    const timeLabel = start ? start.toLocaleString([], { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' }) : '';
+    return `
+      <div class="archive-card" onclick="viewArchive('${archive.id}')">
+        <div class="archive-name">${escapeHtml(archive.name)}</div>
+        <div class="archive-meta">${escapeHtml(dateLabel)}${timeLabel ? ' • ' + escapeHtml(timeLabel) : ''}</div>
+        <div class="archive-stats">
+          <div class="archive-stat"><div class="archive-stat-value">${archive.members.length}</div><div class="archive-stat-label">Members</div></div>
+          <div class="archive-stat"><div class="archive-stat-value">${archive.pins.length}</div><div class="archive-stat-label">Pins</div></div>
+          <div class="archive-stat"><div class="archive-stat-value">${archive.messages.length}</div><div class="archive-stat-label">Messages</div></div>
+        </div>
+        <div class="archive-actions">
+          <button class="archive-share-btn" onclick="event.stopPropagation();shareArchive('${archive.id}')">Share</button>
+          <button class="archive-share-btn danger" onclick="event.stopPropagation();deleteArchive('${archive.id}')">Delete</button>
+        </div>
+      </div>`;
+  }).join('');
 }
 
 function shareArchive(id) {
@@ -800,6 +1028,109 @@ function shareArchive(id) {
   if (!archive) return;
   const text = `Hunt: ${archive.name}\n${archive.date}\nMembers: ${archive.members.length}\nPins: ${archive.pins.length}\nMessages: ${archive.messages.length}`;
   if (navigator.share) navigator.share({ text }); else prompt('Copy:', text);
+}
+
+function deleteArchive(id) {
+  if (!confirm('Delete this archive? This cannot be undone.')) return;
+  state.archives = state.archives.filter(a => a.id !== id);
+  saveArchives();
+  renderArchives();
+}
+
+// Open the archive viewer modal showing every pin dropped during the
+// hunt. Pins are listed in chronological order with their type, notes,
+// and any attached photos.
+function viewArchive(id) {
+  const archive = state.archives.find(a => a.id === id);
+  if (!archive) return;
+
+  const start = archive.startTime ? new Date(archive.startTime) : null;
+  const end = archive.endTime ? new Date(archive.endTime) : null;
+  const dur = archive.durationMs ? formatDuration(archive.durationMs) : '';
+
+  const memberNames = archive.members
+    .map(m => `<span class="archive-chip" style="background:${m.color || '#888'}">${escapeHtml(m.name || 'Unknown')}</span>`)
+    .join(' ');
+
+  const pinItems = archive.pins.length === 0
+    ? '<div class="empty-state" style="padding:24px"><p>No pins were dropped.</p></div>'
+    : archive.pins
+        .slice()
+        .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0))
+        .map(pin => {
+          const type = PIN_TYPES[pin.type] || { icon: '📍', label: pin.type };
+          const t = pin.timestamp ? new Date(pin.timestamp).toLocaleString([], { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' }) : '';
+          const imageHtml = pin.image ? `<img class="archive-pin-image" src="${pin.image}" alt="">` : '';
+          const text = pin.text ? escapeHtml(pin.text) : '<em style="color:var(--text-secondary)">No notes</em>';
+          return `
+            <div class="archive-pin">
+              <div class="archive-pin-icon">${type.icon}</div>
+              <div class="archive-pin-body">
+                <div class="archive-pin-title">${escapeHtml(type.label)} <span class="archive-pin-meta">by ${escapeHtml(pin.creatorName || 'Unknown')} • ${escapeHtml(t)}</span></div>
+                <div class="archive-pin-text">${text}</div>
+                ${imageHtml}
+                <div class="archive-pin-coords">📍 ${pin.latitude.toFixed(5)}, ${pin.longitude.toFixed(5)}</div>
+              </div>
+            </div>`;
+        })
+        .join('');
+
+  const messageItems = archive.messages.length === 0
+    ? ''
+    : `<details class="archive-section">
+        <summary>💬 ${archive.messages.length} message${archive.messages.length === 1 ? '' : 's'}</summary>
+        <div class="archive-chat">
+          ${archive.messages.map(m => `
+            <div class="chat-message">
+              <div class="chat-sender">${escapeHtml(m.senderName || 'Unknown')}</div>
+              <div class="chat-content">${escapeHtml(m.content || '')}</div>
+              <div class="chat-time">${m.timestamp ? new Date(m.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : ''}</div>
+            </div>
+          `).join('')}
+        </div>
+      </details>`;
+
+  document.getElementById('archive-viewer-content').innerHTML = `
+    <div class="modal-header">
+      <h3 class="modal-title">${escapeHtml(archive.name)}</h3>
+      <button class="modal-close" onclick="closeArchiveViewer()">✕</button>
+    </div>
+    <div class="archive-meta-line">
+      <strong>Party:</strong> ${escapeHtml(archive.inviteCode || '')}<br>
+      ${start ? `<strong>Started:</strong> ${escapeHtml(start.toLocaleString())}<br>` : ''}
+      ${end ? `<strong>Ended:</strong> ${escapeHtml(end.toLocaleString())}<br>` : ''}
+      ${dur ? `<strong>Duration:</strong> ${dur}<br>` : ''}
+    </div>
+    <div class="archive-meta-line"><strong>Members:</strong> ${memberNames || '<em>None</em>'}</div>
+    <h4 class="archive-section-title">📍 ${archive.pins.length} pin${archive.pins.length === 1 ? '' : 's'}</h4>
+    <div class="archive-pins">${pinItems}</div>
+    ${messageItems}
+    <button class="modal-btn" onclick="shareArchive('${archive.id}')">Share Archive</button>
+  `;
+  document.getElementById('archive-viewer').classList.add('active');
+}
+
+function closeArchiveViewer() {
+  document.getElementById('archive-viewer').classList.remove('active');
+}
+
+function escapeHtml(s) {
+  if (s == null) return '';
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function formatDuration(ms) {
+  const totalMin = Math.floor(ms / 60000);
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  if (h && m) return `${h}h ${m}m`;
+  if (h) return `${h}h`;
+  return `${m}m`;
 }
 
 function showLoading(text) { document.getElementById('loading-overlay').classList.add('active'); document.getElementById('loading-text').textContent = text || 'Loading...'; }
