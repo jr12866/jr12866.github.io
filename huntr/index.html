@@ -110,6 +110,12 @@
     .archive-meta-line { font-size: 13px; color: var(--text-secondary); margin: 12px 0; line-height: 1.6; }
     .archive-meta-line strong { color: var(--text); }
     .archive-section-title { font-size: 15px; margin: 18px 0 10px; color: var(--primary-light); }
+    .archive-map { height: 280px; width: 100%; border-radius: 10px; margin-bottom: 16px; overflow: hidden; background: var(--background); }
+    .archive-map-empty { padding: 24px; text-align: center; color: var(--text-secondary); background: var(--background); border-radius: 10px; margin-bottom: 16px; }
+    .archive-map-controls { display: flex; gap: 8px; margin-top: -10px; margin-bottom: 16px; }
+    .archive-map-controls button { flex: 1; padding: 10px; background: var(--surface-light); border: none; border-radius: 8px; color: var(--primary-light); font-size: 13px; font-weight: 600; cursor: pointer; }
+    .archive-map-controls button.active { background: var(--primary); color: var(--text); }
+    .archive-pin-marker { pointer-events: auto; }
     .archive-pins { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
     .archive-pin { display: flex; gap: 12px; padding: 12px; background: var(--background); border-radius: 10px; }
     .archive-pin-icon { font-size: 28px; line-height: 1; flex-shrink: 0; }
@@ -1090,6 +1096,14 @@ function viewArchive(id) {
         </div>
       </details>`;
 
+  // Build the map region once we know whether the archive has any pins
+  // with valid coordinates. With none, fall back to a placeholder so the
+  // modal still closes cleanly without a 0x0 map tile.
+  const mappable = archive.pins.filter(p => Number.isFinite(p.latitude) && Number.isFinite(p.longitude));
+  const mapHtml = mappable.length === 0
+    ? '<div class="archive-map-empty">No pins with locations to display on a map.</div>'
+    : `<div class="archive-map" id="archive-map"></div>`;
+
   document.getElementById('archive-viewer-content').innerHTML = `
     <div class="modal-header">
       <h3 class="modal-title">${escapeHtml(archive.name)}</h3>
@@ -1102,15 +1116,141 @@ function viewArchive(id) {
       ${dur ? `<strong>Duration:</strong> ${dur}<br>` : ''}
     </div>
     <div class="archive-meta-line"><strong>Members:</strong> ${memberNames || '<em>None</em>'}</div>
-    <h4 class="archive-section-title">📍 ${archive.pins.length} pin${archive.pins.length === 1 ? '' : 's'}</h4>
-    <div class="archive-pins">${pinItems}</div>
+    <h4 class="archive-section-title">📍 ${archive.pins.length} pin${archive.pins.length === 1 ? '' : 's'} on the map</h4>
+    ${mapHtml}
+    ${mappable.length > 0 ? `<div class="archive-map-controls">
+      <button onclick="focusArchivePin(0)">First Pin</button>
+      <button onclick="fitArchiveMap()">Fit All</button>
+      <button id="archive-map-members-btn" onclick="toggleArchiveMembers()">Show Members</button>
+    </div>` : ''}
+    <details class="archive-section" open>
+      <summary>Pin details</summary>
+      <div class="archive-pins">${pinItems}</div>
+    </details>
     ${messageItems}
     <button class="modal-btn" onclick="shareArchive('${archive.id}')">Share Archive</button>
   `;
   document.getElementById('archive-viewer').classList.add('active');
+  if (mappable.length > 0) initArchiveMap(archive, mappable);
+}
+
+// Track the Leaflet map instance for the currently-open archive so we can
+// (a) destroy it cleanly when the modal closes, and (b) re-focus it for
+// the First Pin / Fit All / Member Paths buttons below the map.
+let archiveMap = null;
+let archiveMapPins = [];
+let archiveMapMembers = [];
+let archiveMapPathsVisible = false;
+
+const ARCHIVE_PIN_COLORS = {
+  observation: '#FF6B6B',
+  landmark: '#4ECDC4',
+  game_sighting: '#96CEB4'
+};
+
+function initArchiveMap(archive, mappable) {
+  // Tear down any previous instance so reopening a different archive
+  // doesn't leak markers or hold a stale tile cache.
+  if (archiveMap) { archiveMap.remove(); archiveMap = null; }
+
+  const mapEl = document.getElementById('archive-map');
+  if (!mapEl || typeof L === 'undefined') return;
+
+  archiveMap = L.map(mapEl, { zoomControl: true, scrollWheelZoom: false })
+    .setView([mappable[0].latitude, mappable[0].longitude], 13);
+
+  L.tileLayer('https://tile.opentopomap.org/{z}/{x}/{y}.png', {
+    maxZoom: 17,
+    attribution: '© OpenStreetMap contributors, SRTM | © OpenTopoMap'
+  }).addTo(archiveMap);
+
+  archiveMapPins = mappable.map(pin => {
+    const color = ARCHIVE_PIN_COLORS[pin.type] || '#FF6B6B';
+    const html = `<div style="width:24px;height:24px;background:${color};border:3px solid white;border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 2px 6px rgba(0,0,0,0.4);"></div>`;
+    const icon = L.divIcon({ className: 'archive-pin-marker', html, iconSize: [24, 32], iconAnchor: [12, 32] });
+    const type = PIN_TYPES[pin.type] || { icon: '📍', label: pin.type };
+    const t = pin.timestamp ? new Date(pin.timestamp).toLocaleString([], { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' }) : '';
+    const image = pin.image ? `<img src="${pin.image}" style="max-width:200px;max-height:150px;border-radius:6px;margin:6px 0;display:block;"><br>` : '';
+    const text = pin.text ? escapeHtml(pin.text) : '';
+    const creator = pin.creatorName ? escapeHtml(pin.creatorName) : 'Unknown';
+    const popup = `
+      <div style="min-width:180px;color:#1a1a1a;">
+        <div style="font-weight:600;margin-bottom:4px;">${type.icon} ${escapeHtml(type.label)} <span style="font-weight:400;color:#666;font-size:11px;margin-left:6px;">${escapeHtml(t)}</span></div>
+        <div style="font-size:12px;color:#555;margin-bottom:4px;">by ${creator}</div>
+        ${image}
+        ${text ? `<div style="font-size:13px;">${text}</div>` : '<div style="font-size:12px;color:#999;font-style:italic;">No notes</div>'}
+        <div style="font-size:10px;color:#888;margin-top:4px;">📍 ${pin.latitude.toFixed(5)}, ${pin.longitude.toFixed(5)}</div>
+      </div>
+    `;
+    return L.marker([pin.latitude, pin.longitude], { icon, title: type.label }).bindPopup(popup);
+  });
+  archiveMapPins.forEach(m => m.addTo(archiveMap));
+
+  // Member-tracks overlay (only if any member captured positions).
+  archiveMapMembers = (archive.members || [])
+    .filter(m => Number.isFinite(m.lat) && Number.isFinite(m.lng))
+    .map(m => {
+      const html = `<div style="width:18px;height:18px;border-radius:50%;background:${m.color || '#888'};border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.5);"></div>`;
+      const icon = L.divIcon({ className: 'archive-member-marker', html, iconSize: [18, 18], iconAnchor: [9, 9] });
+      return { member: m, marker: L.marker([m.lat, m.lng], { icon, title: m.name }).bindPopup(`<b>${escapeHtml(m.name || 'Member')}</b>`) };
+    });
+
+  // Auto-fit the bounds.
+  fitArchiveMap(true);
+
+  // Modal layout settles after the slide-in animation; invalidateSize
+  // makes Leaflet recompute the container's pixel dimensions.
+  setTimeout(() => archiveMap && archiveMap.invalidateSize(), 50);
+}
+
+function fitArchiveMap(initial = false) {
+  if (!archiveMap) return;
+  const layers = L.featureGroup([
+    ...archiveMapPins,
+    ...archiveMapMembers.map(m => m.marker)
+  ]);
+  if (layers.getLayers().length === 0) return;
+  if (layers.getLayers().length === 1) {
+    const only = layers.getLayers()[0];
+    const latlng = only.getLatLng();
+    archiveMap.setView(latlng, initial ? 14 : archiveMap.getZoom());
+    return;
+  }
+  const bounds = layers.getBounds();
+  if (bounds.isValid()) archiveMap.fitBounds(bounds.pad(0.15));
+}
+
+function focusArchivePin(idx) {
+  if (!archiveMap || !archiveMapPins[idx]) return;
+  const pin = archiveMapPins[idx];
+  archiveMap.setView(pin.getLatLng(), 15, { animate: true });
+  pin.openPopup();
+}
+
+function toggleArchiveMembers() {
+  if (!archiveMap) return;
+  archiveMapPathsVisible = !archiveMapPathsVisible;
+  archiveMapMembers.forEach(({ marker }) => {
+    if (archiveMapPathsVisible) marker.addTo(archiveMap);
+    else archiveMap.removeLayer(marker);
+  });
+  const btn = document.getElementById('archive-map-members-btn');
+  if (btn) {
+    btn.classList.toggle('active', archiveMapPathsVisible);
+    btn.textContent = archiveMapPathsVisible ? 'Hide Members' : 'Show Members';
+  }
+  if (archiveMapPathsVisible) fitArchiveMap();
 }
 
 function closeArchiveViewer() {
+  // Tear down the Leaflet map so the next archive opens fresh.
+  if (archiveMap) {
+    archiveMap.remove();
+    archiveMap = null;
+    archiveMapPins = [];
+    archiveMapMembers = [];
+    archiveMapPathsVisible = false;
+  }
   document.getElementById('archive-viewer').classList.remove('active');
 }
 
